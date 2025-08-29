@@ -1,4 +1,3 @@
-#services/budget/fetch.py
 """
 ==================================================================
 BUDGET FETCHING MODULE
@@ -35,17 +34,12 @@ import pandas as pd
 # Add Python "re" library for expression matching
 import re
 
-# Add internal Google BigQuery module for integration
-from infrastructure.bigquery.schema import normalize_string_snake
-from infrastructure.bigquery.schema import remove_string_accents
-
 # Add internal Budget module for data handling
-from services.budget.config import MAPPING_BUDGET_GSPREAD
-from services.budget.schema import ensure_table_schema
+from config.schema import ensure_table_schema
 
 # 1. FETCH BUDGET SHEETS FOR FACT TABLES
 
-# 1.1. Fetch all valid worksheets (excluding filters) from Google Sheet defined in config and return them as a dictionary
+# 1.1. Fetch all valid worksheets (excluding filters)
 def fetch_budget_allocation(gc, sheet_id: str, worksheet_name: str, selected_month: str | None = None) -> pd.DataFrame:
     print(f"🚀 [FETCH] Fetching budget allocation from {worksheet_name} sheet in {sheet_id} file...")
     logging.info(f"🚀 [FETCH] Fetching budget allocation from {worksheet_name} sheet in {sheet_id} file...")
@@ -66,11 +60,14 @@ def fetch_budget_allocation(gc, sheet_id: str, worksheet_name: str, selected_mon
         logging.error(f"❌ [FETCH] Cannot fetch data from {worksheet_name} worksheet in {sheet_id} file due to {e}.")
         return pd.DataFrame()
 
-    # 1.1.2. Normailize column names to snake_case
+    # 1.1.2. Normalize column names to snake_case
     try:
         print(f"🔄 [FETCH] Normalizing name for {len(df.columns)} column(s) in budget allocation...")
         logging.info(f"🔄 [FETCH] Normalizing name for {len(df.columns)} column(s) in budget allocation...")
-        df.columns = [normalize_string_snake(col) for col in df.columns]
+        df.columns = [
+            re.sub(r'(?<!^)(?=[A-Z])', '_', col.strip()).replace(" ", "_").lower()
+            for col in df.columns
+        ]
         print(f"✅ [FETCH] Successfully normalized name for {len(df.columns)} column(s) in budget allocation.")
         logging.info(f"✅ [FETCH] Successfully normalized name for {len(df.columns)} column(s) in budget allocation.")
         if df.empty:
@@ -80,11 +77,32 @@ def fetch_budget_allocation(gc, sheet_id: str, worksheet_name: str, selected_mon
         print(f"❌ [FETCH] Failed to normalize column name(s) from budget allocation due to {e}.")
         logging.error(f"❌ [FETCH] Failed to normalize column name(s) from budget allocation due to {e}.")
 
-    # 1.1.3. Remove unicode accents from budget column name(s)
+    # 1.1.3. Remove unicode accents
     try:
         print(f"🔄 [FETCH] Removing unicode accents for {len(df.columns)} column name(s) in budget allocation...")
         logging.info(f"🔄 [FETCH] Removing unicode accents for {len(df.columns)} column name(s) in budget allocation...")
-        df.columns = [remove_string_accents(col) for col in df.columns]
+
+        vietnamese_map = {
+            'á': 'a', 'à': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+            'ă': 'a', 'ắ': 'a', 'ằ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+            'â': 'a', 'ấ': 'a', 'ầ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+            'đ': 'd',
+            'é': 'e', 'è': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+            'ê': 'e', 'ế': 'e', 'ề': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+            'í': 'i', 'ì': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+            'ó': 'o', 'ò': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+            'ô': 'o', 'ố': 'o', 'ồ': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+            'ơ': 'o', 'ớ': 'o', 'ờ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+            'ú': 'u', 'ù': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+            'ư': 'u', 'ứ': 'u', 'ừ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+            'ý': 'y', 'ỳ': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+        }
+        vietnamese_map_upper = {k.upper(): v.upper() for k, v in vietnamese_map.items()}
+        full_map = {**vietnamese_map, **vietnamese_map_upper}
+        df.columns = [
+            ''.join(full_map.get(c, c) for c in col) if isinstance(col, str) else col
+            for col in df.columns
+        ]
         print(f"✅ [FETCH] Successfully removed unicode accents for {len(df.columns)} column name(s) in budget allocation.")
         logging.info(f"✅ [FETCH] Successfully removed unicode accents for {len(df.columns)} column name(s) in budget allocation.")
         if df.empty:
@@ -94,7 +112,7 @@ def fetch_budget_allocation(gc, sheet_id: str, worksheet_name: str, selected_mon
         print(f"❌ [FETCH] Failed to remove unicode accents from budget column name(s) due to {e}.")
         logging.error(f"❌ [FETCH] Failed to remove unicode accents from budget column name(s) due to {e}.")
     
-    # 1.1.4. Enforce schema for budget allocation
+    # 1.1.4. Enforce schema
     try:
         print(f"🔄 [INGEST] Enforcing schema for {len(df)} row(s) of budget allocation...")
         logging.info(f"🔄 [INGEST] Enforcing schema for {len(df)} row(s) of budget allocation...")

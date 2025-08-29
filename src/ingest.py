@@ -1,4 +1,3 @@
-#services/budget/ingest.py
 """
 ==================================================================
 BUDGET INGESTION MODULE
@@ -23,18 +22,24 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
-# Add datetime utilities for managing timestamps and timezone conversions
+# Add datetime utilities for integration
 from datetime import datetime
-import pytz
 
-# Add logging capability for tracking process execution and errors
+# Add logging ultilities for integration
 import logging
 
-# Add Python Pandas library for data processing
+# Add Python Pandas library for integration
 import pandas as pd
 
-# Add Python "re" library for expression matching
-import re
+# Add timezone ultilites for integration
+import pytz
+
+# Add UUID libraries for integration
+import uuid
+
+# Add Google Authentication libraries for integration
+from google.auth import default
+from google.auth.exceptions import DefaultCredentialsError
 
 # Add Google API core library for integration
 from google.api_core.exceptions import NotFound
@@ -42,37 +47,36 @@ from google.api_core.exceptions import NotFound
 # Add Google Cloud library for integration
 from google.cloud import bigquery
 
-# Add internal Google BigQuery module for integration
-from infrastructure.bigquery.loader import delete_row_existing
-from infrastructure.bigquery.client import init_bigquery_client
-from infrastructure.bigquery.loader import load_bigquery_dataframe
+# Add Google Sheet libraries for integration
+import gspread
 
-# Add internal Google Secret Manager for integration
-from infrastructure.secret.config import get_resolved_project
+# Add internal Google Sheet module for configuration
+from config.schema import ensure_table_schema
 
-# Add internal Google Sheet module for integration
-from infrastructure.gspread.client import init_gspread_client
+# Add internal Google Sheet module for handing
+from src.enrich import enrich_budget_insights
+from src.fetch import fetch_budget_allocation
 
-# Add internal Budget module for data handling
-from services.budget.config import (
-    MAPPING_BUDGET_GSPREAD,
-    get_dataset_budget,
-)
-from services.budget.enrich import enrich_budget_insights
-from services.budget.fetch import fetch_budget_allocation
-from services.budget.schema import ensure_table_schema
-
-# Add UUID module to generate unique identifiers for ingest operations or error tracking
-import uuid
-
-# Get Budget service environment variable for Company
+# Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
 
-# Get Budget service environment variable for Platform
+# Get environment variable for Google Cloud Project ID
+PROJECT = os.getenv("PROJECT")
+
+# Get environment variable for Platform
 PLATFORM = os.getenv("PLATFORM")
 
-# Get Budget service environment variable for Account
+# Get environmetn variable for Department
+DEPARTMENT = os.getenv("DEPARTMENT")
+
+# Get environment variable for Account
 ACCOUNT = os.getenv("ACCOUNT")
+
+# Get nvironment variable for Layer
+LAYER = os.getenv("LAYER")
+
+# Get environment variable for Mode
+MODE = os.getenv("MODE")
 
 # 1. INGEST BUDGET ALLOCATION FROM GOOGLE SHEETS TO GOOGLE BIGQUERY RAW TABLE
 
@@ -88,11 +92,19 @@ def ingest_budget_allocation(
     print(f"🚀 [INGEST] Starting to ingest budget allocation for month {thang}...")
     logging.info(f"🚀 [INGEST] Starting to ingest budget allocation for month {thang}...")
 
-    # 1.1.1. Call Google Sheets API to fetch budget allocation
+    # 1.1.1. Call Google Sheets API
     try:
         print(f"🔍 [INGEST] Fetching budget allocation for month {thang} from API...")
         logging.info(f"🔍 [INGEST] Fetching budget allocation for month {thang} from API...")
-        gc = init_gspread_client()
+        try:
+            scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+            creds, _ = default(scopes=scopes)
+            gc = gspread.Client(auth=creds)
+            gc.session = gspread.requests.AuthorizedSession(creds)
+        except DefaultCredentialsError as e:
+            raise RuntimeError("❌ [INGEST] Failed to initialize Google Sheets client due to credentials error.") from e
+        except Exception as e:
+            raise RuntimeError(f"❌ [INGEST] Failed to initialize Google Sheets client due to {e}.") from e
         df = fetch_budget_allocation(gc, sheet_id, worksheet_name)
         print(f"✅ [INGEST] Successfully fetching {len(df)} rows(s) of budget allocation.")
         logging.info(f"✅ [INGEST] Successfully fetching {len(df)} rows(s) of budget allocation.")
@@ -104,8 +116,8 @@ def ingest_budget_allocation(
         print(f"❌ [INGEST] Failed to fetch budget allocation due to {e}.")
         logging.error(f"❌ [INGEST] Failed to fetch budget allocation due to {e}.")
         return pd.DataFrame()
-    
-    # 1.1.2 Enrich budget allocation
+
+        # 1.1.2 Enrich dataframe
     try:
         print(f"🔁 [INGEST] Enriching budget allocation for month {thang} with {len(df)} row(s)...")
         logging.info(f"🔁 [INGEST] Enriching budget allocation for month {thang} with {len(df)} row(s)...")
@@ -119,9 +131,8 @@ def ingest_budget_allocation(
         raise
 
     # 1.1.3. Prepare table_id
-    project_id = get_resolved_project()
-    raw_dataset = get_dataset_budget("raw")
-    table_id = f"{project_id}.{raw_dataset}.{COMPANY}_table_{PLATFORM}_{ACCOUNT}_{worksheet_name}"
+    raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"
+    table_id = f"{PROJECT}.{raw_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_{worksheet_name}"
     print(f"🔍 [INGEST] Proceeding to ingest budget allocation for {thang} with {table_id} table_id...")
     logging.info(f"🔍 [INGEST] Proceeding to ingest budget allocation for {thang} with {table_id} table_id...")
     
@@ -142,7 +153,10 @@ def ingest_budget_allocation(
         print(f"🔍 [INGEST] Checking budget allocation table {table_id} existence...")
         logging.info(f"🔍 [INGEST] Checking budget allocation table {table_id} existence...")
         df = df.drop_duplicates()
-        client = init_bigquery_client()
+        try:
+            client = bigquery.Client(project=PROJECT)
+        except DefaultCredentialsError as e:
+            raise RuntimeError(" ❌ [INGEST] Failed to initialize Google BigQuery client due to credentials error.") from e
         try:
             client.get_table(table_id)
             table_exists = True
@@ -185,7 +199,7 @@ def ingest_budget_allocation(
             logging.info(f"⚠️ [INGEST] Budget allocation table {table_id} exists then existing row(s) deletion with unique key {thang} will be proceeding...")
             unique_keys = pd.DataFrame({"thang": [thang]}).dropna().drop_duplicates()
             if not unique_keys.empty:
-                temp_table_id = f"{project_id}.{raw_dataset}.temp_delete_keys_{uuid.uuid4().hex[:8]}"
+                temp_table_id = f"{PROJECT}.{raw_dataset}.temp_table_budget_allocation_delete_keys_{uuid.uuid4().hex[:8]}"
                 job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
                 client.load_table_from_dataframe(unique_keys, temp_table_id, job_config=job_config).result()
                 delete_query = f"""
@@ -208,7 +222,7 @@ def ingest_budget_allocation(
         logging.error(f"❌ [INGEST] Failed to ingest budget allocation for table {table_id} due to {e}.")
         raise
 
-    # 1.1.6. Load to BigQuery
+    # 1.1.6. Upload to BigQuery
     try:
         print(f"🔍 [INGEST] Uploading {len(df)} row(s) of budget allocation to table {table_id}...")
         logging.info(f"🔍 [INGEST] Uploading {len(df)} row(s) of budget allocation to table {table_id}...")

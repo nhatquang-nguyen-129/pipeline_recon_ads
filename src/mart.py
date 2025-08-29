@@ -1,4 +1,3 @@
-#services/budget/mart.py
 """
 ==================================================================
 BUDGET MATERIALIZATION MODULE
@@ -26,31 +25,35 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
-# Add logging capability for tracking process execution and errors
+# Add logging ultilies for integration
 import logging
 
+# Add Google Authentication libraries for integration
+from google.auth.exceptions import DefaultCredentialsError
+
+# Add Google CLoud libraries for integration
 from google.cloud import bigquery
 
-# Add Python "re" library for expression matching
-import re
-
-# Add internal Google BigQuery module for integration
-from infrastructure.bigquery.client import init_bigquery_client
-
-# Add internal Google Secret Manager module for integration
-from infrastructure.secret.config import get_resolved_project
-
-# Get Google Cloud Project ID environment variable
-PROJECT = os.getenv("GCP_PROJECT_ID")
-
-# Get Budget service environment variable for Company
+# Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
 
-# Get Budget service environment variable for Platform
+# Get environment variable for Google Cloud Project ID
+PROJECT = os.getenv("PROJECT")
+
+# Get environment variable for Platform
 PLATFORM = os.getenv("PLATFORM")
 
-# Get Budget service environment variable for Account
+# Get environmetn variable for Department
+DEPARTMENT = os.getenv("DEPARTMENT")
+
+# Get environment variable for Account
 ACCOUNT = os.getenv("ACCOUNT")
+
+# Get nvironment variable for Layer
+LAYER = os.getenv("LAYER")
+
+# Get environment variable for Mode
+MODE = os.getenv("MODE")
 
 # 1. TRANSFORM BUDGET STAGING DATA INTO MONTHLY MATERIALIZED TABLE IN GOOGLE BIGQUERY
 
@@ -61,11 +64,14 @@ def mart_budget_all():
     if not COMPANY:
         raise ValueError("❌ [MART] Missing COMPANY environment variable.")
 
-    # 1.1.1. Prepare full table_id for raw layer in BigQuery 
+    # 1.1.1. Prepare table_id
     try:
-        bq_client = init_bigquery_client()
+        try:
+            bigquery_client = bigquery.Client(project=PROJECT)
+        except DefaultCredentialsError as e:
+            raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
         staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_gspread_staging"
-        staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_monthly"
+        staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
         print(f"🔍 [MART] Using staging table {staging_table} to build materialized table for budget allocation...")
         logging.info(f"🔍 [MART] Using staging table {staging_table} to build materialized table for budget allocation...")
         mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_gspread_mart"
@@ -73,7 +79,7 @@ def mart_budget_all():
         print(f"🔍 [INGEST] Preparing to build materialized table {mart_table_monthly} for budget allocation...")
         logging.info(f"🔍 [INGEST] Preparing to build materialized table {mart_table_monthly} for budget allocation...")
 
-    # 1.1.2. Query all staging tables to build materialized table for monthly budget allocation
+    # 1.1.2. Query all staging tables to build materialized table
         query = f"""
             CREATE OR REPLACE TABLE `{mart_table_monthly}` AS
             SELECT
@@ -99,9 +105,9 @@ def mart_budget_all():
                 ngan_sach_khac
             FROM `{staging_table}`
         """
-        bq_client.query(query).result()
+        bigquery_client.query(query).result()
         count_query = f"SELECT COUNT(1) AS row_count FROM `{mart_table_monthly}`"
-        row_count = list(bq_client.query(count_query).result())[0]["row_count"]
+        row_count = list(bigquery_client.query(count_query).result())[0]["row_count"]
         print(f"✅ [MART] Successfully created materialized table {mart_table_monthly} with {row_count} row(s) for monthly budget allocation.")
         logging.info(f"✅ [MART] Successfully created materialized table {mart_table_monthly} with {row_count} row(s) for monthly budget allocation.")
     except Exception as e:
@@ -115,9 +121,12 @@ def mart_budget_event():
 
     try:
         # 1.2.1. Prepare full table_id for raw layer in BigQuery
-        bq_client = init_bigquery_client()
+        try:
+            bigquery_client = bigquery.Client(project=PROJECT)
+        except DefaultCredentialsError as e:
+            raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
         staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_gspread_staging"
-        staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_monthly"
+        staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
         print(f"🔍 [MART] Using {staging_table} staging table to build materialized table for special event(s) budget allocation...")
         logging.info(f"🔍 [MART] Using {staging_table} staging table to build materialized table for special event(s) budget allocation...")
         mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_gspread_mart"
@@ -132,11 +141,11 @@ def mart_budget_event():
                 WHERE special_event_name IS NOT NULL
                 AND special_event_name != 'None'
             """
-            query_job = bq_client.query(query_get_events)
+            query_job = bigquery_client.query(query_get_events)
             results = query_job.result()
             special_events = [row.special_event_name for row in results]
-            print(f"✅ [MART] Successfully retrieved {len(special_events)} special event(s): {special_events}.")
-            logging.info(f"✅ [MART] Successfully retrieved {len(special_events)} special event(s): {special_events}.")
+            print(f"✅ [MART] Successfully retrieved {len(special_events)} special event(s) included {special_events}.")
+            logging.info(f"✅ [MART] Successfully retrieved {len(special_events)} special event(s) included {special_events}.")
             if not special_events:
                 print(f"⚠️ [MART] No special events found in {staging_table} staging table of budget allocation.")
                 logging.warning(f"⚠️ [MART] No special events found in {staging_table} staging table of budget allocation.")
@@ -146,9 +155,9 @@ def mart_budget_event():
             logging.error(f"❌ [MART] Failed while retrieving special events from {staging_table} due to {e}.")
             raise
 
-        # 1.2.3. Loop through each special event and build mart table
+        # 1.2.3. Loop through each special event
         for special_event_name in special_events:
-            mart_table_event = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_budget_{special_event_name}_monthly"
+            mart_table_event = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{special_event_name}_allocation_monthly"
             print(f"🔍 [MART] Preparing to build materialized table {mart_table_event} for Facebook campaign spending...")
             logging.info(f"🔍 [MART] Preparing to build materialized table {mart_table_event} for Facebook campaign spending...")
 
@@ -178,10 +187,9 @@ def mart_budget_event():
                 FROM `{staging_table}`
                 WHERE special_event_name = '{special_event_name}'
             """
-            bq_client.query(query_create_table).result()
-
+            bigquery_client.query(query_create_table).result()
             count_query = f"SELECT COUNT(1) AS row_count FROM `{mart_table_event}`"
-            row_count = list(bq_client.query(count_query).result())[0]["row_count"]
+            row_count = list(bigquery_client.query(count_query).result())[0]["row_count"]
             print(f"✅ [MART] Successfully created materialized table {mart_table_event} with {row_count} row(s) for monthly budget allocation.")
             logging.info(f"✅ [MART] Successfully created materialized table {mart_table_event} with {row_count} row(s) for monthly budget allocation.")
     except Exception as e:
@@ -197,16 +205,18 @@ def mart_budget_supplier():
         raise ValueError("❌ [MART] Missing COMPANY environment variable.")
 
     try:
-        bq_client = init_bigquery_client()
+        # 1.3.1. Prepare table_id
+        try:
+            bigquery_client = bigquery.Client(project=PROJECT)
+        except DefaultCredentialsError as e:
+            raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
         staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_gspread_staging"
-        staging_table = f"{get_resolved_project()}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_monthly"
+        staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
         print(f"🔍 [MART] Using staging table {staging_table} to build materialized table for supplier budget allocation...")
         logging.info(f"🔍 [MART] Using staging table {staging_table} to build materialized table for supplier budget allocation...")
-
         mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_gspread_mart"
-        mart_table_supplier = f"{get_resolved_project()}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_supplier_monthly"
-        supplier_list_table = f"{get_resolved_project()}.kids_dataset_budget_gspread_raw.kids_table_budget_supplier_list"
-
+        mart_table_supplier = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_supplier_monthly"
+        supplier_list_table = f"{PROJECT}.kids_dataset_budget_gspread_raw.kids_table_budget_supplier_list"
         print(f"🔍 [MART] Preparing to build materialized table {mart_table_supplier} for supplier budget allocation...")
         logging.info(f"🔍 [MART] Preparing to build materialized table {mart_table_supplier} for supplier budget allocation...")
 
@@ -239,10 +249,9 @@ def mart_budget_supplier():
               ON REGEXP_CONTAINS(b.chuong_trinh, s.brand_name)  -- match theo brand_name
             WHERE b.ma_ngan_sach_cap_1 = 'NC'
         """
-        bq_client.query(query).result()
-
+        bigquery_client.query(query).result()
         count_query = f"SELECT COUNT(1) AS row_count FROM `{mart_table_supplier}`"
-        row_count = list(bq_client.query(count_query).result())[0]["row_count"]
+        row_count = list(bigquery_client.query(count_query).result())[0]["row_count"]
         print(f"✅ [MART] Successfully created materialized table {mart_table_supplier} with {row_count} row(s) for supplier budget allocation.")
         logging.info(f"✅ [MART] Successfully created materialized table {mart_table_supplier} with {row_count} row(s) for supplier budget allocation.")
 
