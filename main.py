@@ -65,59 +65,14 @@ if not all([COMPANY, PLATFORM, ACCOUNT, LAYER, MODE]):
 try:
     update_module = importlib.import_module(f"services.{PLATFORM}.update")
 except ModuleNotFoundError:
-    raise ImportError(f"❌ [MAIN] Platform '{PLATFORM}' is not supported so please ensure services/{PLATFORM}/update.py exists.")
+    raise ImportError(f"❌ [MAIN] Platform '{PLATFORM}' is not supported so please ensure src/update.py exists.")
 
 # 1.2. Main entrypoint function
 def main():
     today = datetime.today()
 
     # 1.2.1. PLATFORM = facebook (keep original logic)
-    if PLATFORM == "facebook":
-        try:
-            update_campaign_insights = update_module.update_campaign_insights
-            update_ad_insights = update_module.update_ad_insights
-        except AttributeError:
-            raise ImportError(f"❌ [MAIN] Facebook update module must define update_campaign_insights and update_ad_insights.")
-        layers = [layer.strip() for layer in LAYER.split(",") if layer.strip()]
-        if len(layers) != 1:
-            raise ValueError("⚠️ [MAIN] Only one layer is supported per execution so please run separately for each layer.")
-        if MODE == "today":
-            start_date = end_date = today.strftime("%Y-%m-%d")
-        elif MODE == "last3days":
-            start = today - timedelta(days=3)
-            start_date = start.strftime("%Y-%m-%d")
-            end_date = today.strftime("%Y-%m-%d")
-        elif MODE == "last7days":
-            start = today - timedelta(days=7)
-            start_date = start.strftime("%Y-%m-%d")
-            end_date = today.strftime("%Y-%m-%d")
-        elif MODE == "thismonth":
-            start = today.replace(day=1)
-            start_date = start.strftime("%Y-%m-%d")
-            end_date = today.strftime("%Y-%m-%d")
-        elif MODE == "lastmonth":
-            first_day_this_month = today.replace(day=1)
-            last_day_last_month = first_day_this_month - timedelta(days=1)
-            first_day_last_month = last_day_last_month.replace(day=1)
-            start_date = first_day_last_month.strftime("%Y-%m-%d")
-            end_date = last_day_last_month.strftime("%Y-%m-%d")
-        else:
-            raise ValueError(f"⚠️ [MAIN] Unsupported mode {MODE} so please re-check input environment variable.")
-        if "campaign" in layers:
-            print(f"🚀 [MAIN] Starting to update {PLATFORM} campaign insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}...")
-            logging.info(f"🚀 [MAIN] Starting to update {PLATFORM} campaign insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}...")
-            update_campaign_insights(start_date=start_date, end_date=end_date)
-            print(f"✅ [MAIN] Successfully completed update {PLATFORM} campaign insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}.")
-            logging.info(f"✅ [MAIN] Successfully completed update {PLATFORM} campaign insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}.")
-        if "ad" in layers:
-            print(f"🚀 [MAIN] Starting to update {PLATFORM} ad insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}...")
-            logging.info(f"🚀 [MAIN] Starting to update {PLATFORM} ad insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}...")
-            update_ad_insights(start_date=start_date, end_date=end_date)
-            print(f"✅ [MAIN] Successfully completed update {PLATFORM} ad insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}.")
-            logging.info(f"✅ [MAIN] Successfully completed update {PLATFORM} ad insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}.")
-
-    # 1.2.2. PLATFORM = budget
-    elif PLATFORM == "budget":
+    if PLATFORM == "budget":
         try:
             update_budget_allocation = update_module.update_budget_allocation
         except AttributeError:
@@ -137,34 +92,6 @@ def main():
         update_budget_allocation(thang)
         print(f"✅ [MAIN] Successfully completed update budget allocation of {COMPANY} for {thang}.")
         logging.info(f"✅ [MAIN] Successfully completed update budget allocation of {COMPANY} for {thang}.")
-
-     # 1.2.3. PLATFORM = ads
-    elif PLATFORM == "ads":
-        try:
-            update_spend = update_module.update_spend_all
-            update_recon = update_module.update_recon_all
-        except AttributeError:
-            raise ImportError(f"❌ [MAIN] Ads update module must define 'mart_spend_all' and 'mart_recon_all'.")
-        layers = [layer.strip() for layer in LAYER.split(",") if layer.strip()]
-        if len(layers) != 1:
-            raise ValueError("⚠️ [MAIN] Ads only supports one LAYER per execution (spend or recon).")
-        if MODE != "all":
-            raise ValueError("⚠️ [MAIN] Ads only supports MODE=all.")
-        layer = layers[0]
-        if layer == "spend":
-            print(f"🚀 [MAIN] Starting to build unified ads spend mart for {COMPANY}...")
-            logging.info(f"🚀 [MAIN] Starting to build unified ads spend mart for {COMPANY}...")
-            update_spend()
-            print(f"✅ [MAIN] Successfully built unified ads spend mart for {COMPANY}.")
-            logging.info(f"✅ [MAIN] Successfully built unified ads spend mart for {COMPANY}.")
-        elif layer == "recon":
-            print(f"🚀 [MAIN] Starting to build unified ads spend reconciliation mart for {COMPANY}...")
-            logging.info(f"🚀 [MAIN] Starting to build unified ads spend reconciliation mart for {COMPANY}...")
-            update_recon()
-            print(f"✅ [MAIN] Successfully built unified ads spend reconciliation mart for {COMPANY}.")
-            logging.info(f"✅ [MAIN] Successfully built unified ads spend reconciliation mart for {COMPANY}.")
-        else:
-            raise ValueError(f"⚠️ [MAIN] Unsupported ads LAYER={layer}. Use spend or recon.")
 
 # 1.3. Entrypoint guard to run main() when this script is executed directly
 if __name__ == "__main__":
