@@ -22,31 +22,20 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
-# Add logging capability for tracking process execution and errors
+# Add logging ultilities for integration
 import logging
 
-# Add Python Pandas library for data processing
+# Add Python Pandas libraries for integration
 import pandas as pd
 
-# Add Python NumPy library for numerical computing and array operations
-import numpy as np
-
-# Add Python "re" library for expression matching
+# Add Python "re" libraríe for integration
 import re
 
 # Add Google BigQuery library for integration
 from google.cloud import bigquery
 
-# Add internal Google BigQuery module for integration
-from infrastructure.bigquery.client import init_bigquery_client
-from infrastructure.bigquery.loader import load_bigquery_dataframe
-
-# Add internal Google Secret Manager module for integration
-from infrastructure.secret.config import get_resolved_project
-
-# Add internal Budget module for data handling
-from services.budget.schema import ensure_table_schema
-from services.budget.config import get_dataset_budget
+# Add internal Budget module for handling
+from config.schema import ensure_table_schema
 
 # Get Budget service environment variable for Company
 COMPANY = os.getenv("COMPANY") 

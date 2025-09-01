@@ -20,20 +20,22 @@ marketing performance data (e.g. Facebook, Google, TikTok).
 It expects staging data as input and returns enriched data for downstream consumption.
 ==================================================================
 """
-from google.cloud import bigquery
-import pandas as pd
-
 # Add root directory to sys.path for absolute imports of internal modules
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
-# Add logging capability for tracking process execution and errors
+# Add datetime utilities for integration
+import datetime
+
+# Add logging ultilities for integration
 import logging
 
-# Add datetime utilities for managing timestamps and timezone conversions
-from datetime import datetime
+# Add timezone ultilites for integration
 import pytz
+
+# Add Python Pandas libraries for integration
+import pandas as pd
 
 # 1. ENRICH BUDGET INSIGHTS FROM INGESTION PHASE
 
@@ -57,7 +59,6 @@ def enrich_budget_insights(df: pd.DataFrame) -> pd.DataFrame:
     except Exception as e:
         print(f"❌ [ENRICH] Failed to add budget ingestion timestamp due to {e}.")
         logging.exception("❌ [ENRICH] Failed to add budget ingestion timestamp due to {e}.")
-
     return df
 
 # 2. ENRICH BUDGET FIELDS FROM STAGING PHASE
