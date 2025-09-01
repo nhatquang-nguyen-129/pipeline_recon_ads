@@ -1,0 +1,16 @@
+substitutions:
+  _REGION: asia-southeast1
+  _IMAGE: asia-southeast1-docker.pkg.dev/seer-digital-ads/pipeline_budget_ads/v0.0.1
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '${_IMAGE}', '.']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_IMAGE}']
+
+images:
+  - '${_IMAGE}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
