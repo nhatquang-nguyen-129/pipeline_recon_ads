@@ -31,20 +31,35 @@ import pandas as pd
 # Add Python "re" libraríe for integration
 import re
 
+# Add Google Authentication libraries for integration
+from google.auth.exceptions import DefaultCredentialsError
+
 # Add Google BigQuery library for integration
 from google.cloud import bigquery
 
 # Add internal Budget module for handling
 from config.schema import ensure_table_schema
 
-# Get Budget service environment variable for Company
+# Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
 
-# Get Budget service environment variable for Platform
+# Get environment variable for Google Cloud Project ID
+PROJECT = os.getenv("PROJECT")
+
+# Get environment variable for Platform
 PLATFORM = os.getenv("PLATFORM")
 
-# Get Budget service environment variable for Account
+# Get environmetn variable for Department
+DEPARTMENT = os.getenv("DEPARTMENT")
+
+# Get environment variable for Account
 ACCOUNT = os.getenv("ACCOUNT")
+
+# Get nvironment variable for Layer
+LAYER = os.getenv("LAYER")
+
+# Get environment variable for Mode
+MODE = os.getenv("MODE")
 
 # 1. TRANSFORM BUDGET RAW DATA INTO CLEANED STAGING TABLES FOR MODELING AND ANALYSIS
 
@@ -55,20 +70,22 @@ def staging_budget_allocation():
 
     # 1.1.1. Prepare id for raw layer in Google BigQuery
     try:
-        client = init_bigquery_client()
-        project_id = get_resolved_project()
-        raw_dataset = get_dataset_budget("raw")
+        try:
+            client = bigquery.Client(project=PROJECT)
+        except DefaultCredentialsError as e:
+            raise RuntimeError(" ❌ [INGEST] Failed to initialize Google BigQuery client due to credentials error.") from e
+        raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"
         print(f"🔍 [STAGING] Using raw dataset {raw_dataset} to build staging table for budget allocation...")
         logging.info(f"🔍 [STAGING] Using raw dataset {raw_dataset} to build staging table for budget allocation...")
-        staging_dataset = get_dataset_budget("staging")
-        staging_table_budget = f"{project_id}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_monthly"
+        staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_staging"
+        staging_table_budget = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
         print(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for budget allocation...")
         logging.info(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for budget allocation...")
 
-    # 1.1.2. Scan all Facebook raw campaign insights tables which match naming convetion
+    # 1.1.2. Scan all Facebook raw campaign insights table(s)
         print("🔍 [STAGING] Scanning all raw budget allocation table(s)...")
         logging.info("🔍 [STAGING] Scanning all raw budget allocation table(s)...")
-        tables = client.list_tables(f"{project_id}.{raw_dataset}")
+        tables = client.list_tables(f"{PROJECT}.{raw_dataset}")
         raw_tables = [table.table_id for table in tables]
         if not raw_tables:
             print(f"⚠️ [STAGING] No raw budget allocation table(s) found for {COMPANY} company then staging is skipped.")
@@ -82,7 +99,7 @@ def staging_budget_allocation():
         logging.info(f"🔍 [STAGING] Preparing to build staging table {staging_table_budget} for budget allocation...")
         all_dfs = []
         for table in raw_tables:
-            table_id = f"{project_id}.{raw_dataset}.{table}"
+            table_id = f"{PROJECT}.{raw_dataset}.{table}"
             print(f"🔄 [STAGING] Querying raw budget allocation table {table_id}...")
             logging.info(f"🔄 [STAGING] Querying raw budget allocation table {table_id}...")
             worksheet_name = table.split('_')[4].lower() if len(table.split('_')) >= 5 else ""
@@ -129,7 +146,7 @@ def staging_budget_allocation():
         print(f"✅ [STAGING] Succssfully combined {len(df_all)} rows from raw tables of {COMPANY} company.")
         logging.info(f"✅ [STAGING] Succssfully combined {len(df_all)} rows from raw tables of {COMPANY} company.")
     
-    # 1.1.4. Enrich staging budget allocation field(s)
+    # 1.1.4. Enrich budget allocation
         try:
             print(f"🔄 [STAGING] Enriching fields for {len(df_all)} row(s) of staging budget allocation field(s)...")
             logging.info(f"🔄 [STAGING] Enriching fields for {len(df_all)} row(s) of staging budget allocation field(s)...")

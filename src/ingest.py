@@ -86,16 +86,14 @@ def ingest_budget_allocation(
     worksheet_name: str,
     thang: str,
 ) -> pd.DataFrame:
-    if not COMPANY or not ACCOUNT:
-        raise ValueError("Missing COMPANY or PLATFORM or ACCOUNT environment variable.")
 
     print(f"🚀 [INGEST] Starting to ingest budget allocation for month {thang}...")
     logging.info(f"🚀 [INGEST] Starting to ingest budget allocation for month {thang}...")
 
     # 1.1.1. Call Google Sheets API
     try:
-        print(f"🔍 [INGEST] Fetching budget allocation for month {thang} from API...")
-        logging.info(f"🔍 [INGEST] Fetching budget allocation for month {thang} from API...")
+        print(f"🔍 [INGEST] Triggering to fetch budget allocation for month {thang} from Google Sheets API...")
+        logging.info(f" [INGEST] Triggering to fetch budget allocation for month {thang} from Google Sheets API...")
         try:
             scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
             creds, _ = default(scopes=scopes)
@@ -106,28 +104,24 @@ def ingest_budget_allocation(
         except Exception as e:
             raise RuntimeError(f"❌ [INGEST] Failed to initialize Google Sheets client due to {e}.") from e
         df = fetch_budget_allocation(gc, sheet_id, worksheet_name)
-        print(f"✅ [INGEST] Successfully fetching {len(df)} rows(s) of budget allocation.")
-        logging.info(f"✅ [INGEST] Successfully fetching {len(df)} rows(s) of budget allocation.")
         if df.empty:
             print("⚠️ [INGEST] Empty budget allocation returned.")
             logging.warning("⚠️ [INGEST] Empty budget allocation returned.")
             return df
     except Exception as e:
-        print(f"❌ [INGEST] Failed to fetch budget allocation due to {e}.")
-        logging.error(f"❌ [INGEST] Failed to fetch budget allocation due to {e}.")
+        print(f"❌ [INGEST] Failed to trigger budget allocation fetch for month {thang} due to {e}.")
+        logging.error(f"❌ [INGEST] Failed to trigger budget allocation fetch for month {thang} due to {e}.")
         return pd.DataFrame()
 
-        # 1.1.2 Enrich dataframe
+    # 1.1.2 Enrich dataframe
     try:
-        print(f"🔁 [INGEST] Enriching budget allocation for month {thang} with {len(df)} row(s)...")
-        logging.info(f"🔁 [INGEST] Enriching budget allocation for month {thang} with {len(df)} row(s)...")
+        print(f"🔁 [INGEST] Triggering to enrich budget allocation for month {thang} with {len(df)} row(s)...")
+        logging.info(f"🔁 [INGEST] Triggering to enrich budget allocation for month {thang} with {len(df)} row(s)...")
         df = enrich_budget_insights(df)
         df["last_updated_at"] = datetime.utcnow().replace(tzinfo=pytz.UTC)
-        print(f"✅ [INGEST] Successfully enriched budget allocation for {thang} with {len(df)} row(s).")
-        logging.info(f"✅ [INGEST] Successfully enriched budget allocation for {thang} with {len(df)} row(s).")
     except Exception as e:
-        print(f"❌ [INGEST] Failed to enrich budget allocation for {thang} due to {e}.")
-        logging.error(f"❌ [INGEST] Failed to enrich budget allocation for {thang} due to {e}.")
+        print(f"❌ [INGEST] Failed to trigger budget allocation enrichment for {thang} due to {e}.")
+        logging.error(f"❌ [INGEST] Failed to trigger budget allocation enrichment for {thang} due to {e}.")
         raise
 
     # 1.1.3. Prepare table_id
@@ -138,14 +132,12 @@ def ingest_budget_allocation(
     
     # 1.1.4. Enforce schema
     try:
-        print(f"🔄 [INGEST] Enforcing schema for {len(df)} row(s) of budget allocation...")
-        logging.info(f"🔄 [INGEST] Enforcing schema for {len(df)} row(s) of budget allocation...")
+        print(f"🔄 [INGEST] Triggering to enforc schema for {len(df)} row(s) of budget allocation...")
+        logging.info(f"🔄 [INGEST] Triggering to enforc schema for {len(df)} row(s) of budget allocation...")
         df = ensure_table_schema(df, "ingest_budget_allocation")
-        print(f"✅ [INGEST] Successfully enforced schema for {len(df)} row(s) of budget allocation.")
-        logging.info(f"✅ [INGEST] Successfully enforced schema for {len(df)} row(s) of budget allocation.")
     except Exception as e:
-        print(f"❌ [INGEST] Failed to enforce schema for budget allocation due to {e}.")
-        logging.error(f"❌ [INGEST] Failed to enforce schema for budget allocation due to {e}.")
+        print(f"❌ [INGEST] Failed to trigger schema enforcement for budget allocation due to {e}.")
+        logging.error(f"❌ [INGEST] Failed to trigger schema enforcement for budget allocation due to {e}.")
         raise
 
     # 1.1.5. Delete existing row(s) by thang or create new table if not exist

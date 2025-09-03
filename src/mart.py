@@ -61,8 +61,6 @@ MODE = os.getenv("MODE")
 def mart_budget_all():
     print("🚀 [MART] Starting to build materialized table for monthly budget allocation...")
     logging.info("🚀 [MART] Starting to build materialized table for monthly budget allocation...")
-    if not COMPANY:
-        raise ValueError("❌ [MART] Missing COMPANY environment variable.")
 
     # 1.1.1. Prepare table_id
     try:
@@ -75,11 +73,11 @@ def mart_budget_all():
         print(f"🔍 [MART] Using staging table {staging_table} to build materialized table for budget allocation...")
         logging.info(f"🔍 [MART] Using staging table {staging_table} to build materialized table for budget allocation...")
         mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_gspread_mart"
-        mart_table_monthly = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_all_monthly"
+        mart_table_monthly = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
         print(f"🔍 [INGEST] Preparing to build materialized table {mart_table_monthly} for budget allocation...")
         logging.info(f"🔍 [INGEST] Preparing to build materialized table {mart_table_monthly} for budget allocation...")
 
-    # 1.1.2. Query all staging tables to build materialized table
+    # 1.1.2. Query all staging table(s)
         query = f"""
             CREATE OR REPLACE TABLE `{mart_table_monthly}` AS
             SELECT
@@ -158,8 +156,8 @@ def mart_budget_event():
         # 1.2.3. Loop through each special event
         for special_event_name in special_events:
             mart_table_event = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{special_event_name}_allocation_monthly"
-            print(f"🔍 [MART] Preparing to build materialized table {mart_table_event} for Facebook campaign spending...")
-            logging.info(f"🔍 [MART] Preparing to build materialized table {mart_table_event} for Facebook campaign spending...")
+            print(f"🔍 [MART] Preparing to build materialized budget allocation {mart_table_event} table...")
+            logging.info(f"🔍 [MART] Preparing to build materialized budget allocation {mart_table_event} table...")
 
             query_create_table = f"""
                 CREATE OR REPLACE TABLE `{mart_table_event}` AS
@@ -201,8 +199,6 @@ def mart_budget_event():
 def mart_budget_supplier():
     print("🚀 [MART] Starting to build materialized table for supplier budget allocation...")
     logging.info("🚀 [MART] Starting to build materialized table for supplier budget allocation...")
-    if not COMPANY:
-        raise ValueError("❌ [MART] Missing COMPANY environment variable.")
 
     try:
         # 1.3.1. Prepare table_id
@@ -254,7 +250,6 @@ def mart_budget_supplier():
         row_count = list(bigquery_client.query(count_query).result())[0]["row_count"]
         print(f"✅ [MART] Successfully created materialized table {mart_table_supplier} with {row_count} row(s) for supplier budget allocation.")
         logging.info(f"✅ [MART] Successfully created materialized table {mart_table_supplier} with {row_count} row(s) for supplier budget allocation.")
-
     except Exception as e:
         print(f"❌ [MART] Failed to build materialized table for supplier budget allocation due to {e}.")
         logging.error(f"❌ [MART] Failed to build materialized table for supplier budget allocation due to {e}.")

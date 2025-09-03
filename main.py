@@ -1,6 +1,6 @@
 """
 ==================================================================
-MAIN ENTRYPOINT FOR PLATFORM-AGNOSTIC DATA UPDATES
+MAIN ENTRYPOINT
 ------------------------------------------------------------------
 This script serves as the unified CLI **controller** for triggering  
 ads data updates across multiple platforms (e.g., Facebook, Google),  
@@ -71,27 +71,29 @@ except ModuleNotFoundError:
 def main():
     today = datetime.today()
 
-    # 1.2.1. PLATFORM = facebook (keep original logic)
+    # 1.2.1. PLATFORM = budget
     if PLATFORM == "budget":
         try:
             update_budget_allocation = update_module.update_budget_allocation
         except AttributeError:
             raise ImportError(f"❌ [MAIN] Budget update module must define 'update_budget_allocation'.")
         if MODE == "thismonth":
-            thang = today.strftime("%Y-%m")   # e.g. "2025-08"
+            thang = today.strftime("%Y-%m")
         elif MODE == "lastmonth":
             first_day_this_month = today.replace(day=1)
             last_day_last_month = first_day_this_month - timedelta(days=1)
-            thang = last_day_last_month.strftime("%Y-%m")   # e.g. "2025-07"
+            thang = last_day_last_month.strftime("%Y-%m")
         else:
             raise ValueError(f"⚠️ [MAIN] Unsupported mode {MODE} for budget. Use thismonth or lastmonth.")
         if LAYER != "all":
             raise ValueError("⚠️ [MAIN] Budget only supports LAYER=all.")
-        print(f"🚀 [MAIN] Starting to update budget allocation of {COMPANY} for {thang}...")
-        logging.info(f"🚀 [MAIN] Starting to update budget allocation of {COMPANY} for {thang}...")
-        update_budget_allocation(thang)
-        print(f"✅ [MAIN] Successfully completed update budget allocation of {COMPANY} for {thang}.")
-        logging.info(f"✅ [MAIN] Successfully completed update budget allocation of {COMPANY} for {thang}.")
+        try:
+            print(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} in {MODE} mode and {DEPARTMENT} for {thang}...")
+            logging.info(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} in {MODE} mode and {DEPARTMENT} for {thang}...")
+            update_budget_allocation(thang)
+        except Exception as e:
+            print(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} in {MODE} mode and {DEPARTMENT} for {thang} due to {e}.")
+            logging.error(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} in {MODE} mode and {DEPARTMENT} for {thang} due to {e}.")
 
 # 1.3. Entrypoint guard to run main() when this script is executed directly
 if __name__ == "__main__":

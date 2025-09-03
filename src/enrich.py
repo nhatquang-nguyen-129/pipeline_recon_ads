@@ -37,6 +37,27 @@ import pytz
 # Add Python Pandas libraries for integration
 import pandas as pd
 
+# Get environment variable for Company
+COMPANY = os.getenv("COMPANY") 
+
+# Get environment variable for Google Cloud Project ID
+PROJECT = os.getenv("PROJECT")
+
+# Get environment variable for Platform
+PLATFORM = os.getenv("PLATFORM")
+
+# Get environmetn variable for Department
+DEPARTMENT = os.getenv("DEPARTMENT")
+
+# Get environment variable for Account
+ACCOUNT = os.getenv("ACCOUNT")
+
+# Get nvironment variable for Layer
+LAYER = os.getenv("LAYER")
+
+# Get environment variable for Mode
+MODE = os.getenv("MODE")
+
 # 1. ENRICH BUDGET INSIGHTS FROM INGESTION PHASE
 
 # 1.1. Enrich budget insights included standarization, timestamp formatting and source tagging
@@ -73,7 +94,7 @@ def enrich_budget_fields(df: pd.DataFrame) -> pd.DataFrame:
         logging.warning("⚠️ [ENRICH] Budget input dataframe is empty then enrichment is skipped.")
         return df
 
-    # 2.1.1. Standardize platform classification for budget
+    # 2.1.1. Standardize platform classification
     if "nen_tang" in df.columns:
         print("🔍 [ENRICH] Standardizing budget platform classification by 'nen_tang'...")
         logging.info("🔍 [ENRICH] Standardizing budget platform classification by 'nen_tang'...")          

@@ -37,6 +37,27 @@ import re
 # Add internal Budget module for data handling
 from config.schema import ensure_table_schema
 
+# Get environment variable for Company
+COMPANY = os.getenv("COMPANY") 
+
+# Get environment variable for Google Cloud Project ID
+PROJECT = os.getenv("PROJECT")
+
+# Get environment variable for Platform
+PLATFORM = os.getenv("PLATFORM")
+
+# Get environmetn variable for Department
+DEPARTMENT = os.getenv("DEPARTMENT")
+
+# Get environment variable for Account
+ACCOUNT = os.getenv("ACCOUNT")
+
+# Get nvironment variable for Layer
+LAYER = os.getenv("LAYER")
+
+# Get environment variable for Mode
+MODE = os.getenv("MODE")
+
 # 1. FETCH BUDGET SHEETS FOR FACT TABLES
 
 # 1.1. Fetch all valid worksheets (excluding filters)
@@ -81,7 +102,6 @@ def fetch_budget_allocation(gc, sheet_id: str, worksheet_name: str, selected_mon
     try:
         print(f"🔄 [FETCH] Removing unicode accents for {len(df.columns)} column name(s) in budget allocation...")
         logging.info(f"🔄 [FETCH] Removing unicode accents for {len(df.columns)} column name(s) in budget allocation...")
-
         vietnamese_map = {
             'á': 'a', 'à': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
             'ă': 'a', 'ắ': 'a', 'ằ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
@@ -117,8 +137,6 @@ def fetch_budget_allocation(gc, sheet_id: str, worksheet_name: str, selected_mon
         print(f"🔄 [INGEST] Enforcing schema for {len(df)} row(s) of budget allocation...")
         logging.info(f"🔄 [INGEST] Enforcing schema for {len(df)} row(s) of budget allocation...")
         df = ensure_table_schema(df, "fetch_budget_allocation")
-        print(f"✅ [FETCH] Successfully enforced {len(df)} row(s) of budget allocation for {selected_month}.")
-        logging.info(f"✅ [FETCH] Successfully enforced {len(df)} row(s) of budget allocation for {selected_month}.")
         if df.empty:
             print("⚠️ [FETCH] Empty dataframe returned from budget allocation then enforcement is skipped.")
             logging.warning("⚠️ [FETCH] Empty dataframe returned from budget allocation then enforcement is skipped.")                   

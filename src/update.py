@@ -52,30 +52,35 @@ from datetime import (
     timezone
 )
 
-# 
-from infrastructure.gspread.client import init_gspread_client
-from infrastructure.secret.config import get_resolved_project
-
 # Add internal Budget service for data handling
-from services.budget.config import MAPPING_BUDGET_GSPREAD, get_dataset_budget
-from services.budget.ingest import ingest_budget_allocation
-from services.budget.staging import staging_budget_allocation
-from services.budget.mart import (
+from src.config import MAPPING_BUDGET_GSPREAD, get_dataset_budget
+from src.ingest import ingest_budget_allocation
+from src.staging import staging_budget_allocation
+from src.mart import (
     mart_budget_all,
     mart_budget_event
 )
 
-# Get Google Cloud Project ID environment variable
-PROJECT = os.getenv("GCP_PROJECT_ID")
-
-# Get Budget service environment variable for Company
+# Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
 
-# Get Budget service environment variable for Platform
+# Get environment variable for Google Cloud Project ID
+PROJECT = os.getenv("PROJECT")
+
+# Get environment variable for Platform
 PLATFORM = os.getenv("PLATFORM")
 
-# Get Budget service environment variable for Account
+# Get environmetn variable for Department
+DEPARTMENT = os.getenv("DEPARTMENT")
+
+# Get environment variable for Account
 ACCOUNT = os.getenv("ACCOUNT")
+
+# Get nvironment variable for Layer
+LAYER = os.getenv("LAYER")
+
+# Get environment variable for Mode
+MODE = os.getenv("MODE")
 
 # 1. UPDATE BUDGET ALLOCATION FOR A GIVEN DATE RANGE
 
