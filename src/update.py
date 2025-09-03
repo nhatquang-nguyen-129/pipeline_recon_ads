@@ -32,12 +32,19 @@ import pandas as pd
 
 # Add Google Authentication libraries for integration
 from google.auth.exceptions import DefaultCredentialsError
+from google.auth import default
 
 # Add Google API Core libraries for integration
 from google.api_core.exceptions import NotFound
 
+# Add Google Spreadsheets API libraries for integration
+import gspread
+
 # Add Google CLoud libraries for integration
 from google.cloud import bigquery
+
+# Add Google Secret Manager libraries for integration
+from google.cloud import secretmanager
 
 # Add Python "re" library for expression matching
 import re
@@ -53,7 +60,6 @@ from datetime import (
 )
 
 # Add internal Budget service for data handling
-from src.config import MAPPING_BUDGET_GSPREAD, get_dataset_budget
 from src.ingest import ingest_budget_allocation
 from src.staging import staging_budget_allocation
 from src.mart import (
@@ -91,23 +97,15 @@ def update_budget_allocation(thang: str) -> None:
 
     # 1.1.1. Start timing the update process
     start_time = time.time()
-
-    # 1.1.2. Validate environment variables
-    try:
-        sheet_id = MAPPING_BUDGET_GSPREAD[COMPANY][PLATFORM]["account"][ACCOUNT]
-        print(f"🚀 [UPDATE] Using sheet {sheet_id} to update budget allocation for {thang}...")
-        logging.info(f"🚀 [UPDATE] Using sheet {sheet_id} to update budget allocation for {thang}...")
-    except KeyError:
-        raise ValueError(f"❌ [UPDATE] Invalid mapping for {COMPANY} - {PLATFORM} - {ACCOUNT}")
-    
-    # 1.1.3. Prepare raw_table_id in BigQuery  
-    raw_dataset = get_dataset_budget("raw")  
+   
+    # 1.1.2. Prepare raw_table_id in BigQuery  
+    raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"  
     year, month = thang.split("-")
     raw_table_id = f"{PROJECT}.{raw_dataset}.{COMPANY}_table_budget_{ACCOUNT}_m{int(month):02d}{year}"
     print(f"🔍 [UPDATE] Verifying raw budget allocation table {raw_table_id}...")
     logging.info(f"🔍 [UPDATE] Verifying raw budget allocation table {raw_table_id}...")
 
-    # 1.1.4. Iterate over input date range to verify data freshness
+    # 1.1.3. Iterate over input date range to verify data freshness
     should_ingest = False
     try:
         try:
@@ -146,6 +144,20 @@ def update_budget_allocation(thang: str) -> None:
         logging.info(f"✅ [UPDATE] Raw budget allocation table for {thang} month is up to date then ingestion is skipped.")
         return
 
+    # 1.1.4. Get sheet_id from Google Secret Manager
+    try:
+        secret_client = secretmanager.SecretManagerServiceClient()
+        secret_id = f"{COMPANY}_secret_{DEPARTMENT}_{PLATFORM}_sheet_id_{ACCOUNT}"
+        secret_name = f"projects/{PROJECT}/secrets/{secret_id}/versions/latest"
+        response = secret_client.access_secret_version(request={"name": secret_name})
+        sheet_id = response.payload.data.decode("UTF-8")
+        print(f"🚀 [UPDATE] Using sheet {sheet_id} to update budget allocation for {thang}...")
+        logging.info(f"🚀 [UPDATE] Using sheet {sheet_id} to update budget allocation for {thang}...")
+    except Exception as e:
+        raise RuntimeError(
+            f"❌ [UPDATE] Failed to fetch sheet_id from Secret Manager for {COMPANY} - {PLATFORM} - {ACCOUNT} due to {e}."
+        ) from e
+
     # 1.1.5. Ingest monthly budget
     worksheet_monthly = f"m{int(month):02d}{year}"
     try:
@@ -162,7 +174,15 @@ def update_budget_allocation(thang: str) -> None:
     # 1.1.6. Ingest special event(s) budget
     df_specials = []
     try:
-        gc = init_gspread_client()
+        try:
+            scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+            creds, _ = default(scopes=scopes)
+            gc = gspread.Client(auth=creds)
+            gc.session = gspread.requests.AuthorizedSession(creds)
+        except DefaultCredentialsError as e:
+            raise RuntimeError("❌ [INGEST] Failed to initialize Google Sheets client due to credentials error.") from e
+        except Exception as e:
+            raise RuntimeError(f"❌ [INGEST] Failed to initialize Google Sheets client due to {e}.") from e
         sh = gc.open_by_key(sheet_id)
         worksheet_list = [ws.title for ws in sh.worksheets()]
         logging.info(f"📑 Found worksheets in sheet {sheet_id}: {worksheet_list}")

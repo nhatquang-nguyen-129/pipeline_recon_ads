@@ -191,7 +191,10 @@ def staging_budget_allocation():
         try:
             print(f"🔍 [STAGING] Uploading {len(df_all)} row(s) of staging budget allocation table {staging_table_budget}...")
             logging.info(f"🔍 [STAGING] Uploading {len(df_all)} row(s) of staging budget allocation table {staging_table_budget}...")
-            client = init_bigquery_client()
+            try:
+                client = bigquery.Client(project=PROJECT)
+            except DefaultCredentialsError as e:
+                raise RuntimeError("❌ [STAGING] Failed to initialize Google BigQuery client due to credentials error.") from e
             if "special_event_name" in df_all.columns:
                 df_all["special_event_name"] = df_all["special_event_name"].where(
                     pd.notnull(df_all["special_event_name"]), None
