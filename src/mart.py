@@ -134,17 +134,17 @@ def mart_budget_event():
         # 1.2.2. Get distinct special_event_name
         try:
             query_get_events = f"""
-                SELECT DISTINCT special_event_name
+                SELECT DISTINCT REGEXP_EXTRACT(special_event_name, r'^[a-zA-Z]+') AS event_prefix
                 FROM `{staging_table}`
                 WHERE special_event_name IS NOT NULL
                 AND special_event_name != 'None'
             """
             query_job = bigquery_client.query(query_get_events)
             results = query_job.result()
-            special_events = [row.special_event_name for row in results]
-            print(f"✅ [MART] Successfully retrieved {len(special_events)} special event(s) included {special_events}.")
-            logging.info(f"✅ [MART] Successfully retrieved {len(special_events)} special event(s) included {special_events}.")
-            if not special_events:
+            event_prefixes = [row.event_prefix for row in results if row.event_prefix]
+            print(f"✅ [MART] Successfully retrieved {len(event_prefixes)} special event(s) included {event_prefixes}.")
+            logging.info(f"✅ [MART] Successfully retrieved {len(event_prefixes)} special event(s) included {event_prefixes}.")
+            if not event_prefixes:
                 print(f"⚠️ [MART] No special events found in {staging_table} staging table of budget allocation.")
                 logging.warning(f"⚠️ [MART] No special events found in {staging_table} staging table of budget allocation.")
                 return
@@ -153,9 +153,9 @@ def mart_budget_event():
             logging.error(f"❌ [MART] Failed while retrieving special events from {staging_table} due to {e}.")
             raise
 
-        # 1.2.3. Loop through each special event
-        for special_event_name in special_events:
-            mart_table_event = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{special_event_name}_allocation_monthly"
+        # 1.2.3. Loop through each special event prefix
+        for event_prefix in event_prefixes:
+            mart_table_event = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{event_prefix}_allocation_monthly"
             print(f"🔍 [MART] Preparing to build materialized budget allocation {mart_table_event} table...")
             logging.info(f"🔍 [MART] Preparing to build materialized budget allocation {mart_table_event} table...")
 
@@ -183,7 +183,7 @@ def mart_budget_event():
                     ngan_sach_tuyen_dung,
                     ngan_sach_khac
                 FROM `{staging_table}`
-                WHERE special_event_name = '{special_event_name}'
+                WHERE REGEXP_EXTRACT(special_event_name, r'^[a-zA-Z]+') = '{event_prefix}'
             """
             bigquery_client.query(query_create_table).result()
             count_query = f"SELECT COUNT(1) AS row_count FROM `{mart_table_event}`"
@@ -194,3 +194,6 @@ def mart_budget_event():
         print(f"❌ [MART] Failed to build materialized table for Facebook creative performance due to {e}.")
         logging.error(f"❌ [MART] Failed to build materialized table for Facebook creative performance due to {e}.")
         raise
+
+if __name__ == "__main__":
+    mart_budget_event()
