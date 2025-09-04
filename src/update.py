@@ -31,8 +31,9 @@ import logging
 import pandas as pd
 
 # Add Google Authentication libraries for integration
-from google.auth.exceptions import DefaultCredentialsError
 from google.auth import default
+from google.auth.exceptions import DefaultCredentialsError
+from google.auth.transport.requests import AuthorizedSession
 
 # Add Google API Core libraries for integration
 from google.api_core.exceptions import NotFound
@@ -178,14 +179,14 @@ def update_budget_allocation(thang: str) -> None:
             scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
             creds, _ = default(scopes=scopes)
             gc = gspread.Client(auth=creds)
-            gc.session = gspread.requests.AuthorizedSession(creds)
+            gc.session = AuthorizedSession(creds)
         except DefaultCredentialsError as e:
-            raise RuntimeError("❌ [INGEST] Failed to initialize Google Sheets client due to credentials error.") from e
+            raise RuntimeError("❌ [UPDATE] Failed to initialize Google Sheets client due to credentials error.") from e
         except Exception as e:
-            raise RuntimeError(f"❌ [INGEST] Failed to initialize Google Sheets client due to {e}.") from e
+            raise RuntimeError(f"❌ [UPDATE] Failed to initialize Google Sheets client due to {e}.") from e
         sh = gc.open_by_key(sheet_id)
         worksheet_list = [ws.title for ws in sh.worksheets()]
-        logging.info(f"📑 Found worksheets in sheet {sheet_id}: {worksheet_list}")
+        logging.info(f"[UPDATE] 📑 Found worksheets in sheet {sheet_id}: {worksheet_list}")
     except Exception as e:
         print(f"❌ [UPDATE] Failed to fetch worksheet list from sheet {sheet_id} due to {e}.")
         logging.error(f"❌ [UPDATE] Failed to fetch worksheet list from sheet {sheet_id} due to {e}.")

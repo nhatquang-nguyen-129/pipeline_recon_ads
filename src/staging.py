@@ -102,7 +102,7 @@ def staging_budget_allocation():
             table_id = f"{PROJECT}.{raw_dataset}.{table}"
             print(f"🔄 [STAGING] Querying raw budget allocation table {table_id}...")
             logging.info(f"🔄 [STAGING] Querying raw budget allocation table {table_id}...")
-            worksheet_name = table.split('_')[4].lower() if len(table.split('_')) >= 5 else ""
+            worksheet_name = table.split('_')[-1].lower()
             if worksheet_name == "supplier":
                 print(f"⚠️ [STAGING] Found supplier table {table} then it is skipped.")
                 logging.warning(f"⚠️ [STAGING] Found supplier table {table} then it is skipped.")

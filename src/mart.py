@@ -68,11 +68,11 @@ def mart_budget_all():
             bigquery_client = bigquery.Client(project=PROJECT)
         except DefaultCredentialsError as e:
             raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
-        staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_gspread_staging"
+        staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_staging"
         staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
         print(f"🔍 [MART] Using staging table {staging_table} to build materialized table for budget allocation...")
         logging.info(f"🔍 [MART] Using staging table {staging_table} to build materialized table for budget allocation...")
-        mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_gspread_mart"
+        mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
         mart_table_monthly = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
         print(f"🔍 [INGEST] Preparing to build materialized table {mart_table_monthly} for budget allocation...")
         logging.info(f"🔍 [INGEST] Preparing to build materialized table {mart_table_monthly} for budget allocation...")
@@ -123,11 +123,11 @@ def mart_budget_event():
             bigquery_client = bigquery.Client(project=PROJECT)
         except DefaultCredentialsError as e:
             raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
-        staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_gspread_staging"
+        staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_staging"
         staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
         print(f"🔍 [MART] Using {staging_table} staging table to build materialized table for special event(s) budget allocation...")
         logging.info(f"🔍 [MART] Using {staging_table} staging table to build materialized table for special event(s) budget allocation...")
-        mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_gspread_mart"
+        mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
         print(f"🔍 [MART] Preparing to build materialized table for special event(s) budget allocation in {mart_dataset} dataset...")
         logging.info(f"🔍 [MART] Preparing to build materialized table for special event(s) budget allocation in {mart_dataset} dataset...")
 

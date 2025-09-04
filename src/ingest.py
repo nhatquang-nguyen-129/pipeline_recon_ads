@@ -40,6 +40,7 @@ import uuid
 # Add Google Authentication libraries for integration
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
+from google.auth.transport.requests import AuthorizedSession
 
 # Add Google API core library for integration
 from google.api_core.exceptions import NotFound
@@ -98,7 +99,7 @@ def ingest_budget_allocation(
             scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
             creds, _ = default(scopes=scopes)
             gc = gspread.Client(auth=creds)
-            gc.session = gspread.requests.AuthorizedSession(creds)
+            gc.session = AuthorizedSession(creds)
         except DefaultCredentialsError as e:
             raise RuntimeError("❌ [INGEST] Failed to initialize Google Sheets client due to credentials error.") from e
         except Exception as e:

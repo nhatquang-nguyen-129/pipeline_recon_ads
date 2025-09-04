@@ -26,7 +26,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
 # Add datetime utilities for integration
-import datetime
+from datetime import datetime
 
 # Add logging ultilities for integration
 import logging
