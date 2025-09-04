@@ -37,6 +37,9 @@ import pytz
 # Add Python Pandas libraries for integration
 import pandas as pd
 
+# Add Python "re" library for handling
+import re
+
 # Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
 
@@ -85,7 +88,7 @@ def enrich_budget_insights(df: pd.DataFrame) -> pd.DataFrame:
 # 2. ENRICH BUDGET FIELDS FROM STAGING PHASE
 
 # 2.1. Enrich budget fields by adding derived fields such as month_key, classification fields and mapping keys
-def enrich_budget_fields(df: pd.DataFrame) -> pd.DataFrame:
+def enrich_budget_fields(df: pd.DataFrame, table_id: str) -> pd.DataFrame:
     print("🚀 [ENRICH] Starting to enrich budget staging data...")
     logging.info("🚀 [ENRICH] Starting to enrich budget staging data...")    
 
@@ -121,4 +124,22 @@ def enrich_budget_fields(df: pd.DataFrame) -> pd.DataFrame:
         missing = required_cols - set(df.columns)
         print(f"⚠️ [ENRICH] Missing columns for budget {missing}.")
         logging.warning(f"⚠️ [ENRICH] Missing columns for budget {missing}.")
+
+    # 2.1.3. Enrich metadata from table_id
+    try:
+        table_name = table_id.split(".")[-1]
+        match = re.search(
+            r"^(?P<company>\w+)_table_budget_(?P<department>\w+)_(?P<account>\w+)_allocation_(?P<worksheet>\w+)$",
+            table_name
+        )
+        if match:
+            df["phong_ban"] = match.group("department")
+            df["tai_khoan"] = match.group("account")
+            df["worksheet_name"] = match.group("worksheet")
+            print("✅ [ENRICH] Successfully enriched budget metadata from table_id.")
+            logging.info("✅ [ENRICH] Successfully enriched budget metadata from table_id.")
+    except Exception as e:
+        print(f"⚠️ [ENRICH] Failed to enrich budget metadata: {e}")
+        logging.warning(f"⚠️ [ENRICH] Failed to enrich budget metadata: {e}")
+
     return df

@@ -64,8 +64,7 @@ from datetime import (
 from src.ingest import ingest_budget_allocation
 from src.staging import staging_budget_allocation
 from src.mart import (
-    mart_budget_all,
-    mart_budget_event
+    mart_budget_all
 )
 
 # Get environment variable for Company
@@ -93,165 +92,71 @@ MODE = os.getenv("MODE")
 
 # 1.1. Update budget allocation data for a given date range
 def update_budget_allocation(thang: str) -> None:
-    print(f"🚀 [UPDATE] Starting to update budget allocation for {thang} month...")
-    logging.info(f"🚀 [UPDATE] Starting to update budget allocation for {thang} month...")
+    print(f"🚀 [UPDATE] Starting to update budget allocation for {thang}...")
+    logging.info(f"🚀 [UPDATE] Starting to update budget allocation for {thang}...")
 
-    # 1.1.1. Start timing the update process
     start_time = time.time()
-   
-    # 1.1.2. Prepare raw_table_id in BigQuery  
-    raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"  
     year, month = thang.split("-")
-    raw_table_id = f"{PROJECT}.{raw_dataset}.{COMPANY}_table_budget_{ACCOUNT}_m{int(month):02d}{year}"
-    print(f"🔍 [UPDATE] Verifying raw budget allocation table {raw_table_id}...")
-    logging.info(f"🔍 [UPDATE] Verifying raw budget allocation table {raw_table_id}...")
 
-    # 1.1.3. Iterate over input date range to verify data freshness
-    should_ingest = False
-    try:
-        try:
-            client = bigquery.Client(project=PROJECT)
-        except DefaultCredentialsError as e:
-            raise RuntimeError(" ❌ [UPDATE] Failed to initialize Google BigQuery client due to credentials error.") from e
-        client.get_table(raw_table_id)
-    except NotFound:
-        print(f"⚠️ [UPDATE] Raw budget allocation table {raw_table_id} not found then ingestion will be starting...")
-        logging.warning(f"⚠️ [UPDATE] Raw budget allocation table {raw_table_id} not found then ingestion will be starting...")
-        should_ingest = True
-    else:
-        query = f"SELECT MAX(last_updated_at) as last_updated FROM `{raw_table_id}`"
-        try:
-            result = client.query(query).result()
-            last_updated = list(result)[0]["last_updated"]
-            if not last_updated:
-                print(f"⚠️ [UPDATE] No last_update_at found in raw budget allocation table {raw_table_id} then ingestion will be starting...")
-                logging.warning(f"⚠️ [UPDATE] No last_update_at found in raw budget allocation table {raw_table_id} then ingestion will be starting...")
-                should_ingest = True
-            else:
-                delta = datetime.now(timezone.utc) - last_updated
-                if delta > timedelta(hours=1):
-                    print(f"⚠️ [UPDATE] Raw budget table {raw_table_id} is outdated with last_update_at is {last_updated} then ingestion will be starting...")
-                    logging.warning(f"⚠️ [UPDATE] Raw budget table {raw_table_id} is outdated with last_update_at is {last_updated} then ingestion will be starting...")
-                    should_ingest = True
-                else:
-                    print(f"✅ [UPDATE] Raw budget table {raw_table_id} is up to date with last_update_at is {last_updated} then ingestion is skipped.")
-                    logging.info(f"✅ [UPDATE] Raw budget table {raw_table_id} is up to date with last_update_at is {last_updated} then ingestion is skipped.")
-        except Exception as e:
-            print(f"❌ [UPDATE] Failed to verify freshness of {raw_table_id} due to {e}.")
-            logging.error(f"❌ [UPDATE] Failed to verify freshness of {raw_table_id} due to {e}.")
-            should_ingest = False
-    if not should_ingest:
-        print(f"✅ [UPDATE] Raw budget allocation table for {thang} month is up to date then ingestion is skipped.")
-        logging.info(f"✅ [UPDATE] Raw budget allocation table for {thang} month is up to date then ingestion is skipped.")
-        return
+    # 1.1. Lấy sheet_id từ Secret Manager
+    secret_client = secretmanager.SecretManagerServiceClient()
+    secret_id = f"{COMPANY}_secret_{DEPARTMENT}_{PLATFORM}_sheet_id_{ACCOUNT}"
+    secret_name = f"projects/{PROJECT}/secrets/{secret_id}/versions/latest"
+    response = secret_client.access_secret_version(request={"name": secret_name})
+    sheet_id = response.payload.data.decode("UTF-8")
 
-    # 1.1.4. Get sheet_id from Google Secret Manager
+    # 1.2. Khởi tạo Google Sheets client
     try:
-        secret_client = secretmanager.SecretManagerServiceClient()
-        secret_id = f"{COMPANY}_secret_{DEPARTMENT}_{PLATFORM}_sheet_id_{ACCOUNT}"
-        secret_name = f"projects/{PROJECT}/secrets/{secret_id}/versions/latest"
-        response = secret_client.access_secret_version(request={"name": secret_name})
-        sheet_id = response.payload.data.decode("UTF-8")
-        print(f"🚀 [UPDATE] Using sheet {sheet_id} to update budget allocation for {thang}...")
-        logging.info(f"🚀 [UPDATE] Using sheet {sheet_id} to update budget allocation for {thang}...")
-    except Exception as e:
-        raise RuntimeError(
-            f"❌ [UPDATE] Failed to fetch sheet_id from Secret Manager for {COMPANY} - {PLATFORM} - {ACCOUNT} due to {e}."
-        ) from e
-
-    # 1.1.5. Ingest monthly budget
-    worksheet_monthly = f"m{int(month):02d}{year}"
-    try:
-        print(f"🔄 [UPDATE] Triggering monthly budget ingestion for {worksheet_monthly} sheet for {thang} month...")
-        logging.info(f"🔄 [UPDATE] Triggering monthly budget ingestion for {worksheet_monthly} sheet for {thang} month...")
-        df_monthly = ingest_budget_allocation(sheet_id, worksheet_monthly, thang)
-        print(f"✅ [UPDATE] Successfully ingested monthly budget {worksheet_monthly} with {len(df_monthly)} row(s) for {thang} month.")
-        logging.info(f"✅ [UPDATE] Successfully ingested monthly budget {worksheet_monthly} with {len(df_monthly)} row(s) for {thang} month.")
-    except Exception as e:
-        print(f"❌ [UPDATE] Failed to ingest monthly budget {worksheet_monthly} due to {e}.")
-        logging.error(f"❌ [UPDATE] Failed to ingest monthly budget {worksheet_monthly} due to {e}.")
-        raise
-
-    # 1.1.6. Ingest special event(s) budget
-    df_specials = []
-    try:
-        try:
-            scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-            creds, _ = default(scopes=scopes)
-            gc = gspread.Client(auth=creds)
-            gc.session = AuthorizedSession(creds)
-        except DefaultCredentialsError as e:
-            raise RuntimeError("❌ [UPDATE] Failed to initialize Google Sheets client due to credentials error.") from e
-        except Exception as e:
-            raise RuntimeError(f"❌ [UPDATE] Failed to initialize Google Sheets client due to {e}.") from e
+        scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+        creds, _ = default(scopes=scopes)
+        gc = gspread.Client(auth=creds)
+        gc.session = AuthorizedSession(creds)
         sh = gc.open_by_key(sheet_id)
         worksheet_list = [ws.title for ws in sh.worksheets()]
-        logging.info(f"[UPDATE] 📑 Found worksheets in sheet {sheet_id}: {worksheet_list}")
     except Exception as e:
-        print(f"❌ [UPDATE] Failed to fetch worksheet list from sheet {sheet_id} due to {e}.")
-        logging.error(f"❌ [UPDATE] Failed to fetch worksheet list from sheet {sheet_id} due to {e}.")
-        raise
-    pattern = re.compile(rf".*{year}$")
-    special_sheets = [ws for ws in worksheet_list if pattern.match(ws) and not ws.startswith("m")]
+        raise RuntimeError(f"❌ [UPDATE] Failed to init Google Sheets client due to {e}")
+
+    # 1.3. Xác định sheet monthly + special
+    worksheet_monthly = f"m{int(month):02d}{year}"  # dạng mMMYYYY
+    pattern_special = re.compile(rf".*{year}$")     # dạng fesYYYY, snYYYY...
+    monthly_sheets = [ws for ws in worksheet_list if ws == worksheet_monthly]
+    special_sheets = [ws for ws in worksheet_list if pattern_special.match(ws) and not ws.startswith("m")]
+
+    # 2. Ingest monthly budget
+    df_monthly = None
+    if monthly_sheets:
+        print(f"🔄 [UPDATE] Ingesting monthly budget sheet {worksheet_monthly}...")
+        df_monthly = ingest_budget_allocation(sheet_id, worksheet_monthly, thang) \
+            .query("thang == @thang")  # lọc đúng tháng
+        print(f"✅ [UPDATE] Loaded {len(df_monthly)} row(s) from monthly {worksheet_monthly} for {thang}.")
+
+    # 3. Ingest special budgets (full load, lọc theo thang trong data)
+    df_specials = []
     for ws in special_sheets:
-        try:
-            print(f"🔄 [UPDATE] Triggering special budget ingestion for worksheet {ws} (thang={thang})...")
-            logging.info(f"🔄 [UPDATE] Triggering special budget ingestion for worksheet {ws} (thang={thang})...")
-            df_special = ingest_budget_allocation(sheet_id, ws, thang)
+        print(f"🔄 [UPDATE] Ingesting special budget sheet {ws} (full load)...")
+        df_special = ingest_budget_allocation(sheet_id, ws, thang)
+        df_special = df_special.query("thang == @thang")
+        if len(df_special) > 0:
             df_specials.append(df_special)
-            print(f"✅ [UPDATE] Successfully ingested special budget {ws}.")
-            logging.info(f"✅ [UPDATE] Successfully ingested special budget {ws}.")
-        except Exception as e:
-            print(f"❌ [UPDATE] Failed to ingest special budget {ws} due to {e}.")
-            logging.error(f"❌ [UPDATE] Failed to ingest special budget {ws} due to {e}.")
-            raise
+            print(f"✅ [UPDATE] Loaded {len(df_special)} row(s) from special {ws} for {thang}.")
+        else:
+            print(f"⚠️ [UPDATE] No rows matched thang={thang} in special sheet {ws}.")
+
+    # 4. Rebuild staging + mart
     has_monthly = df_monthly is not None and len(df_monthly) > 0
-    has_special = any(df is not None and len(df) > 0 for df in df_specials)
+    has_special = len(df_specials) > 0
 
-    # 1.1.7. Rebuild budget allocation staging table
     if has_monthly or has_special:
-        print("🔄 [UPDATE] Triggering to rebuild staging table for budget allocation...")
-        logging.info("🔄 [UPDATE] Triggering to rebuild staging table for budget allocation...")
-        try:
-            staging_budget_allocation()
-            print("✅ [UPDATE] Successfully rebuilt staging table for budget allocation.")
-            logging.info("✅ [UPDATE] Successfully rebuilt staging table for budget allocation.")
-        except Exception as e:
-            print(f"❌ [UPDATE] Failed to rebuild staging table for budget allocation due to {e}.")
-            logging.error(f"❌ [UPDATE] Failed to rebuild staging table for budget allocation due to {e}.")       
+        print("🔄 [UPDATE] Rebuilding staging & mart for budget allocation...")
+        staging_budget_allocation()
+        mart_budget_all()
+        print("✅ [UPDATE] Rebuilt staging & mart successfully.")
     else:
-        print(f"⚠️ [UPDATE] No monthly or special budget allocation ingested for {thang} then staging table building is skipped.")
-        logging.warning(f"⚠️ [UPDATE] No monthly or special budget allocation ingested for {thang} then staging table building is skipped.")
+        print(f"⚠️ [UPDATE] No data ingested for {thang}, skip staging & mart.")
 
-    # 1.1.8. Rebuild budget allocation materialized table
-    if has_monthly or has_special:
-        try: 
-            print("🔄 [UPDATE] Triggering to rebuild materialized table for monthly budget allocation...")
-            logging.info("🔄 [UPDATE] Triggering to rebuild materialized table for monthly budget allocation...")
-            mart_budget_all()
-            print("✅ [UPDATE] Successfully rebuilt materialized table for monthly budget allocation.")
-            logging.info("✅ [UPDATE] Successfully rebuilt materialized table for monthly budget allocation.")
-        except Exception as e:
-            print(f"❌ [UPDATE] Failed to rebuild materialized table for monthly budget allocation due to {e}.")
-            logging.error(f"❌ [UPDATE] Failed to rebuild materialized table for monthly budget allocation due to {e}.")       
-        try:    
-            print("🔄 [UPDATE] Triggering to rebuild materialized table for special event(s) budget allocation...")
-            logging.info("🔄 [UPDATE] Triggering to rebuild materialized table for special event(s) budget allocation...")
-            mart_budget_event()
-            print("✅ [UPDATE] Successfully rebuilt materialized table for special event(s) budget allocation.")
-            logging.info("✅ [UPDATE] Successfully rebuilt materialized table for special event(s) budget allocation.")
-        except Exception as e:
-            print(f"❌ [UPDATE] Failed to rebuild materialized table for special event(s) budget allocation due to {e}.")
-            logging.error(f"❌ [UPDATE] Failed to rebuild materialized table for special event(s) budget allocation due to {e}  .")             
-    else:
-        print(f"⚠️ [UPDATE] Skip staging & mart because no monthly/special data ingested for {thang}.")
-        logging.warning(f"⚠️ [UPDATE] Skip staging & mart because no monthly/special data ingested for {thang}.")
-
-
-    # 1.1.9. Measure the total execution time of Facebook campaign insights update process
     elapsed = time.time() - start_time
-    print(f"✅ [UPDATE] Successfully completed budget allocation update in {elapsed}s.")
-    logging.info(f"✅ [UPDATE] Successfully completed budget allocation update in {elapsed}s.")
+    print(f"✅ [UPDATE] Completed budget allocation update for {thang} in {elapsed:.2f}s.")
+    logging.info(f"✅ [UPDATE] Completed budget allocation update for {thang} in {elapsed:.2f}s.")
 
 if __name__ == "__main__":
     import argparse

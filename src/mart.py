@@ -59,28 +59,33 @@ MODE = os.getenv("MODE")
 
 # 1.1 Build materialized table for monthly budget allocation by union all staging tables
 def mart_budget_all():
-    print("🚀 [MART] Starting to build materialized table for monthly budget allocation...")
-    logging.info("🚀 [MART] Starting to build materialized table for monthly budget allocation...")
+    print("🚀 [MART] Starting to build materialized table(s) for monthly budget allocation...")
+    logging.info("🚀 [MART] Starting to build materialized table(s) for monthly budget allocation...")
 
-    # 1.1.1. Prepare table_id
     try:
+        # 1.1.1. Prepare BigQuery client
         try:
             bigquery_client = bigquery.Client(project=PROJECT)
         except DefaultCredentialsError as e:
-            raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
+            raise RuntimeError("❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
+
+        # 1.1.2. Define datasets and base tables
         staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_staging"
         staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
-        print(f"🔍 [MART] Using staging table {staging_table} to build materialized table for budget allocation...")
-        logging.info(f"🔍 [MART] Using staging table {staging_table} to build materialized table for budget allocation...")
         mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
-        mart_table_monthly = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
-        print(f"🔍 [INGEST] Preparing to build materialized table {mart_table_monthly} for budget allocation...")
-        logging.info(f"🔍 [INGEST] Preparing to build materialized table {mart_table_monthly} for budget allocation...")
 
-    # 1.1.2. Query all staging table(s)
-        query = f"""
-            CREATE OR REPLACE TABLE `{mart_table_monthly}` AS
+        # ------------------------
+        # 1.2. Create ALL mart table
+        # ------------------------
+        mart_table_all = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
+        print(f"🔍 [MART] Building ALL mart table {mart_table_all} from {staging_table}...")
+        logging.info(f"🔍 [MART] Building ALL mart table {mart_table_all} from {staging_table}...")
+
+        query_all = f"""
+            CREATE OR REPLACE TABLE `{mart_table_all}` AS
             SELECT
+                phong_ban,
+                tai_khoan,
                 ma_ngan_sach_cap_1,
                 chuong_trinh,
                 noi_dung,
@@ -103,97 +108,51 @@ def mart_budget_all():
                 ngan_sach_khac
             FROM `{staging_table}`
         """
-        bigquery_client.query(query).result()
-        count_query = f"SELECT COUNT(1) AS row_count FROM `{mart_table_monthly}`"
-        row_count = list(bigquery_client.query(count_query).result())[0]["row_count"]
-        print(f"✅ [MART] Successfully created materialized table {mart_table_monthly} with {row_count} row(s) for monthly budget allocation.")
-        logging.info(f"✅ [MART] Successfully created materialized table {mart_table_monthly} with {row_count} row(s) for monthly budget allocation.")
-    except Exception as e:
-        print(f"❌ [MART] Failed to build materialized table for Facebook campaign spending due to {e}.")
-        logging.error(f"❌ [MART] Failed to build materialized table for Facebook campaign spending due to {e}.")
+        bigquery_client.query(query_all).result()
 
-# 1.2 Build materialized table for special event(s) budget allocation by union all staging tables
-def mart_budget_event():
-    print("🚀 [MART] Starting to build materialized table for special event(s) budget allocation...")
-    logging.info("🚀 [MART] Starting to build materialized table for special event(s) budget allocation...")
+        # Count rows in ALL mart table
+        count_all = list(bigquery_client.query(
+            f"SELECT COUNT(1) AS row_count FROM `{mart_table_all}`"
+        ).result())[0]["row_count"]
+        print(f"✅ [MART] Created ALL mart table {mart_table_all} with {count_all} row(s).")
+        logging.info(f"✅ [MART] Created ALL mart table {mart_table_all} with {count_all} row(s).")
 
-    try:
-        # 1.2.1. Prepare full table_id for raw layer in BigQuery
-        try:
-            bigquery_client = bigquery.Client(project=PROJECT)
-        except DefaultCredentialsError as e:
-            raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
-        staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_staging"
-        staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
-        print(f"🔍 [MART] Using {staging_table} staging table to build materialized table for special event(s) budget allocation...")
-        logging.info(f"🔍 [MART] Using {staging_table} staging table to build materialized table for special event(s) budget allocation...")
-        mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
-        print(f"🔍 [MART] Preparing to build materialized table for special event(s) budget allocation in {mart_dataset} dataset...")
-        logging.info(f"🔍 [MART] Preparing to build materialized table for special event(s) budget allocation in {mart_dataset} dataset...")
+        # ------------------------
+        # 1.3. Create mart tables per (phong_ban, tai_khoan)
+        # ------------------------
+        distinct_query = f"""
+            SELECT DISTINCT phong_ban, tai_khoan
+            FROM `{staging_table}`
+            WHERE phong_ban IS NOT NULL AND tai_khoan IS NOT NULL
+        """
+        distinct_pairs = bigquery_client.query(distinct_query).result()
 
-        # 1.2.2. Get distinct special_event_name
-        try:
-            query_get_events = f"""
-                SELECT DISTINCT REGEXP_EXTRACT(special_event_name, r'^[a-zA-Z]+') AS event_prefix
+        for row in distinct_pairs:
+            phong_ban = row["phong_ban"]
+            tai_khoan = row["tai_khoan"]
+            table_name = f"{COMPANY}_table_{PLATFORM}_{phong_ban}_{tai_khoan}_allocation_monthly"
+            mart_table = f"{PROJECT}.{mart_dataset}.{table_name}"
+
+            print(f"🔍 [MART] Building mart table {mart_table}...")
+            logging.info(f"🔍 [MART] Building mart table {mart_table}...")
+
+            query = f"""
+                CREATE OR REPLACE TABLE `{mart_table}` AS
+                SELECT *
                 FROM `{staging_table}`
-                WHERE special_event_name IS NOT NULL
-                AND special_event_name != 'None'
+                WHERE phong_ban = '{phong_ban}' AND tai_khoan = '{tai_khoan}'
             """
-            query_job = bigquery_client.query(query_get_events)
-            results = query_job.result()
-            event_prefixes = [row.event_prefix for row in results if row.event_prefix]
-            print(f"✅ [MART] Successfully retrieved {len(event_prefixes)} special event(s) included {event_prefixes}.")
-            logging.info(f"✅ [MART] Successfully retrieved {len(event_prefixes)} special event(s) included {event_prefixes}.")
-            if not event_prefixes:
-                print(f"⚠️ [MART] No special events found in {staging_table} staging table of budget allocation.")
-                logging.warning(f"⚠️ [MART] No special events found in {staging_table} staging table of budget allocation.")
-                return
-        except Exception as e:
-            print(f"❌ [MART] Failed while retrieving special events from {staging_table} due to {e}.")
-            logging.error(f"❌ [MART] Failed while retrieving special events from {staging_table} due to {e}.")
-            raise
+            bigquery_client.query(query).result()
 
-        # 1.2.3. Loop through each special event prefix
-        for event_prefix in event_prefixes:
-            mart_table_event = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{event_prefix}_allocation_monthly"
-            print(f"🔍 [MART] Preparing to build materialized budget allocation {mart_table_event} table...")
-            logging.info(f"🔍 [MART] Preparing to build materialized budget allocation {mart_table_event} table...")
+            count = list(bigquery_client.query(
+                f"SELECT COUNT(1) AS row_count FROM `{mart_table}`"
+            ).result())[0]["row_count"]
+            print(f"✅ [MART] Created mart table {mart_table} with {count} row(s).")
+            logging.info(f"✅ [MART] Created mart table {mart_table} with {count} row(s).")
 
-            query_create_table = f"""
-                CREATE OR REPLACE TABLE `{mart_table_event}` AS
-                SELECT
-                    ma_ngan_sach_cap_1,
-                    chuong_trinh,
-                    noi_dung,
-                    nen_tang,
-                    hinh_thuc,
-                    thang,
-                    thoi_gian_bat_dau,
-                    thoi_gian_ket_thuc,
-                    tong_so_ngay_thuc_chay,
-                    tong_so_ngay_da_qua,
-                    ngan_sach_ban_dau,
-                    ngan_sach_dieu_chinh,
-                    ngan_sach_bo_sung,
-                    ngan_sach_thuc_chi,
-                    ngan_sach_he_thong,
-                    ngan_sach_nha_cung_cap,
-                    ngan_sach_kinh_doanh,
-                    ngan_sach_tien_san,
-                    ngan_sach_tuyen_dung,
-                    ngan_sach_khac
-                FROM `{staging_table}`
-                WHERE REGEXP_EXTRACT(special_event_name, r'^[a-zA-Z]+') = '{event_prefix}'
-            """
-            bigquery_client.query(query_create_table).result()
-            count_query = f"SELECT COUNT(1) AS row_count FROM `{mart_table_event}`"
-            row_count = list(bigquery_client.query(count_query).result())[0]["row_count"]
-            print(f"✅ [MART] Successfully created materialized table {mart_table_event} with {row_count} row(s) for monthly budget allocation.")
-            logging.info(f"✅ [MART] Successfully created materialized table {mart_table_event} with {row_count} row(s) for monthly budget allocation.")
     except Exception as e:
-        print(f"❌ [MART] Failed to build materialized table for Facebook creative performance due to {e}.")
-        logging.error(f"❌ [MART] Failed to build materialized table for Facebook creative performance due to {e}.")
-        raise
+        print(f"❌ [MART] Failed to build mart tables for budget allocation due to {e}.")
+        logging.error(f"❌ [MART] Failed to build mart tables for budget allocation due to {e}.")
 
 if __name__ == "__main__":
-    mart_budget_event()
+    mart_budget_all()

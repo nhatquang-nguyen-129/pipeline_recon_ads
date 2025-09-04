@@ -39,6 +39,7 @@ from google.cloud import bigquery
 
 # Add internal Budget module for handling
 from config.schema import ensure_table_schema
+from src.enrich import enrich_budget_fields
 
 # Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
@@ -82,7 +83,7 @@ def staging_budget_allocation():
         print(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for budget allocation...")
         logging.info(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for budget allocation...")
 
-    # 1.1.2. Scan all Facebook raw campaign insights table(s)
+    # 1.1.2. Scan all raw budget allocation table(s)
         print("🔍 [STAGING] Scanning all raw budget allocation table(s)...")
         logging.info("🔍 [STAGING] Scanning all raw budget allocation table(s)...")
         tables = client.list_tables(f"{PROJECT}.{raw_dataset}")
@@ -94,58 +95,37 @@ def staging_budget_allocation():
         print(f"✅ [STAGING] Successfully found {len(raw_tables)} raw budget table(s) for {COMPANY} company.")
         logging.info(f"✅ [STAGING] Successfully found {len(raw_tables)} raw budget table(s) for {COMPANY} company.")
 
-        # 1.1.3. Query and join all Facebook campaign insights tables
-        print(f"🔍 [STAGING] Preparing to build staging table {staging_table_budget} for budget allocation...")
-        logging.info(f"🔍 [STAGING] Preparing to build staging table {staging_table_budget} for budget allocation...")
+    # 1.1.3. Query raw budget table(s)
         all_dfs = []
         for table in raw_tables:
-            table_id = f"{PROJECT}.{raw_dataset}.{table}"
-            print(f"🔄 [STAGING] Querying raw budget allocation table {table_id}...")
-            logging.info(f"🔄 [STAGING] Querying raw budget allocation table {table_id}...")
-            worksheet_name = table.split('_')[-1].lower()
-            if worksheet_name == "supplier":
-                print(f"⚠️ [STAGING] Found supplier table {table} then it is skipped.")
-                logging.warning(f"⚠️ [STAGING] Found supplier table {table} then it is skipped.")
-                continue
-            is_monthly = bool(re.match(r"^m\d{6}$", worksheet_name))
-            is_special = bool(re.match(r"^[a-z]+202\d$", worksheet_name)) 
-            if not (is_monthly or is_special):
-                print(f"⚠️ [STAGING] Found unknown format table {table} then it is skipped.")
-                logging.warning(f"⚠️ [STAGING] Found unknown format table {table} then it is skipped.")
-                continue
+            raw_table = f"{PROJECT}.{raw_dataset}.{table}"
+            print(f"🔄 [STAGING] Querying raw budget allocation table {raw_table}...")
+            logging.info(f"🔄 [STAGING] Querying raw budget allocation table {raw_table}...")
             try:
-                df = client.query(f"SELECT * FROM `{table_id}`").result().to_dataframe()
-                if df.empty:
+                df_raw = client.query(f"SELECT * FROM `{raw_table}`").to_dataframe()
+                if df_raw.empty:
                     print(f"⚠️ [STAGING] Budget allocation table {table} is empty then query is skipped.")
                     logging.warning(f"⚠️ [STAGING] Budget allocation table {table} is empty then query is skipped.")
                     continue
-                parts = table.split('_')
-                if len(parts) < 5:
-                    print(f"⚠️ [STAGING] Unexpected raw budget allocation table name format {table} then query is skipped.")
-                    logging.warning(f"⚠️ [STAGING] Unexpected raw budget allocation table name format {table} then query is skipped.")
-                    continue
-                department = parts[3] 
-                worksheet_name = parts[4].lower()
-                is_monthly = bool(re.match(r"^m\d{6}$", worksheet_name))
-                if is_monthly:
-                    yyyy = worksheet_name[3:7]
-                    mm = worksheet_name[1:3]
-                    df["thang"] = f"{yyyy}-{mm}"
-                    df["special_event_name"] = None
-                else:
-                    if "thang" not in df.columns:
-                        df["thang"] = "unknown"
-                    df["special_event_name"] = worksheet_name
-                df["department"] = department      
-                all_dfs.append(df)
+                # Enrich fields
+                print(f"🔄 [STAGING] Triggering to enrich staging budget allocation field(s) for {len(df_raw)} row(s) from {raw_table}...")
+                logging.info(f"🔄 [STAGING] Triggering to enrich staging budget allocation field(s) for {len(df_raw)} row(s) from {raw_table}...")
+                df_raw = enrich_budget_fields(df_raw, table_id=raw_table)
+                all_dfs.append(df_raw)
+                print(f"✅ [STAGING] Successfully enriched {len(df_raw)} row(s) from raw budget table {raw_table}.")
+                logging.info(f"✅ [STAGING] Successfully enriched {len(df_raw)} row(s) from raw budget table {raw_table}.")
             except Exception as e:
-                print(f"❌ [STAGING] Failed to query raw budget allocation table {table_id} due to {e}.")
-                logging.warning(f"❌ [STAGING] Failed to query raw budget allocation table {table_id} due to {e}.")
+                print(f"❌ [STAGING] Failed to query raw budget allocation table {raw_table} due to {e}.")
+                logging.warning(f"❌ [STAGING] Failed to query raw budget allocation table {raw_table} due to {e}.")
                 continue
+        if not all_dfs:
+            print("⚠️ [STAGING] No data found in any raw budget allocation table(s).")
+            logging.warning("⚠️ [STAGING] No data found in any raw budget allocation table(s).")
+            return
         df_all = pd.concat(all_dfs, ignore_index=True)
-        print(f"✅ [STAGING] Succssfully combined {len(df_all)} rows from raw tables of {COMPANY} company.")
-        logging.info(f"✅ [STAGING] Succssfully combined {len(df_all)} rows from raw tables of {COMPANY} company.")
-    
+        print(f"✅ [STAGING] Successfully combined {len(df_all)} row(s) from all budget raw tables.")
+        logging.info(f"✅ [STAGING] Successfully combined {len(df_all)} row(s) from all budget raw tables.")
+
     # 1.1.4. Enrich budget allocation
         try:
             print(f"🔄 [STAGING] Enriching fields for {len(df_all)} row(s) of staging budget allocation field(s)...")
@@ -222,6 +202,7 @@ def staging_budget_allocation():
     except Exception as e:
         print(f"❌ [STAGING] Faild to unify staging budget allocation due to {e}.")
         logging.error(f"❌ [STAGING] Faild to unify staging budget allocation due to {e}.")
+
 
 if __name__ == "__main__":
     staging_budget_allocation()
