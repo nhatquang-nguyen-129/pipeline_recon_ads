@@ -30,33 +30,41 @@ import logging
 # Add Python 'time' library for tracking execution time and implementing delays
 import time
 
+# Add Google API Core libraries for integration
+from google.api_core.exceptions import NotFound
+
+# Add Google Authentication libraries for integration
+from google.auth.exceptions import DefaultCredentialsError
+
 # Add Google Cloud libraries for integration
 from google.cloud import bigquery
-from google.cloud.exceptions import NotFound
-
-# Add internal Google BigQuery module for data integration
-from infrastructure.bigquery.client import init_bigquery_client
 
 # Add internal Ads module for data handling
-from services.ads.config import (
+from config.config import (
     MAPPING_ADS_DATASET, 
     MAPPING_ADS_NETWORK
 )
 
-# Get Google Cloud Project ID environment variable
-PROJECT = os.getenv("GCP_PROJECT_ID")
-
-# Get Facebook service environment variable for Brand
+# Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
 
-# Get Facebook service environment variable for Platform
+# Get environment variable for Google Cloud Project ID
+PROJECT = os.getenv("PROJECT")
+
+# Get environment variable for Platform
 PLATFORM = os.getenv("PLATFORM")
 
-# Get Facebook service environment variable for Account
+# Get environmetn variable for Department
+DEPARTMENT = os.getenv("DEPARTMENT")
+
+# Get environment variable for Account
 ACCOUNT = os.getenv("ACCOUNT")
 
-# Get Facebook service environment variable for Layer
+# Get nvironment variable for Layer
 LAYER = os.getenv("LAYER")
+
+# Get environment variable for Mode
+MODE = os.getenv("MODE")
 
 # 1.1. BUILD UNIFIED COST AGGREGATION TABLE FROM ADVERTISING PLATFORM(s)
 
@@ -66,7 +74,10 @@ def mart_spend_all():
     logging.info(f"🚀 [MART] Starting unified daily advertising spend aggregation for {COMPANY} company...")
 
     # 1.1.1. Prepare full table_id for upper layer(s)
-    client = init_bigquery_client()
+    try:
+        bigquery_client = bigquery.Client(project=PROJECT)
+    except DefaultCredentialsError as e:
+        raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
     valid_source_tables = []
     for network in MAPPING_ADS_NETWORK:
         try:
@@ -83,7 +94,7 @@ def mart_spend_all():
         try:
             print(f"🔍 [MART] Scanning for {network} materialized advertising spend table...")
             logging.warning(f"🔍 [MART] Scanning for {network} materialized advertising spend table...")
-            client.get_table(source_table)
+            bigquery_client.get_table(source_table)
             valid_source_tables.append(source_table)
             print(f"✅ [MART] Successfully retrieved {source_table} materialized table for advertising spend unification.")
             logging.warning(f"✅ [MART] Successfully retrieved {source_table} materialized table for advertising spend unification.")
@@ -102,7 +113,7 @@ def mart_spend_all():
     try:
         print(f"🔍 [MART] Checking {output_table} unified advertising spend table existence...")
         logging.info(f"🔍 [MART] Checking {output_table} unified advertising spend table existence...")
-        client.get_table(output_table)
+        bigquery_client.get_table(output_table)
         print(f"✅ [MART] Successfully retrieved {output_table} unified advertising table existence.")
         logging.info(f"✅ [MART] Successfully retrieved {output_table} unified advertising table existence.")
     except NotFound:
@@ -125,7 +136,7 @@ def mart_spend_all():
         table.clustering_fields = ["ma_ngan_sach_cap_1", "chuong_trinh", "noi_dung", "nhan_su"]
         print(f"🔍 [MART] Creating {table} unified advertising spend table...")
         logging.info(f"🔍 [MART] Creating {table} unified advertising spend table...")
-        client.create_table(table)
+        bigquery_client.create_table(table)
         print(f"✅ [MART] Successfully created {table} unified advertising spend table.")
         logging.info(f"✅ [MART] Successfully created {table} unified advertising spend table.")
 
@@ -141,7 +152,7 @@ def mart_spend_all():
     try:
         print(f"🔁 [MART] Executing aggregation query to create {output_table} unified advertising spend table...")
         logging.info(f"🔁 [MART] Executing aggregation query to create {output_table} unified advertising spend table...")
-        client.query(query).result()
+        bigquery_client.query(query).result()
         logging.info(f"✅ [MART] Successfully created materialized table {output_table} for unified advertising spend.")
         print(f"✅ [MART] Successfully created materialized table {output_table} for unified advertising spend.")
     except Exception as e:
@@ -156,7 +167,10 @@ def mart_recon_all():
     logging.info("🚀 [MART] Starting monthly budget allocation and advertising reconciliation...")
 
     # 2.1.1. Prepare full table_id for upper layer(s)
-    client = init_bigquery_client()
+    try:
+        bigquery_client = bigquery.Client(project=PROJECT)
+    except DefaultCredentialsError as e:
+        raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
     valid_source_tables = []
     for network in MAPPING_ADS_NETWORK:
         try:
@@ -171,7 +185,7 @@ def mart_recon_all():
         try:
             print(f"🔍 [MART] Scanning for {network} materialized advertising spend table for advertising spend reconciliation...")
             logging.warning(f"🔍 [MART] Scanning for {network} materialized advertising spend table for advertising spend reconciliation...")
-            client.get_table(input_table)  # sẽ raise NotFound nếu chưa có
+            bigquery_client.get_table(input_table)
             valid_source_tables.append(input_table)
             print(f"✅ [MART] Successfully retrieved {input_table} materialized table for advertising spend unification.")
             logging.warning(f"✅ [MART] Successfully retrieved {input_table} materialized table for advertising spend unification.")
@@ -190,7 +204,7 @@ def mart_recon_all():
     try:
         print(f"🔍 [MART] Checking {output_table_spend} monthly advertising spend table existence...")
         logging.info(f"🔍 [MART] Checking {output_table_spend} monthly advertising spend table existence...")
-        client.get_table(output_table_spend)
+        bigquery_client.get_table(output_table_spend)
         print(f"✅ [MART] Successfully retrieved {output_table_spend} monthly advertising spend table existence.")
         logging.info(f"✅ [MART] Successfully retrieved {output_table_spend} monthly advertising spend table existence.")
     except NotFound:
@@ -209,7 +223,7 @@ def mart_recon_all():
         table.clustering_fields = ["ma_ngan_sach_cap_1", "chuong_trinh", "nhan_su", "thang"]
         print(f"🔍 [MART] Creating {table} monthly advertising spend table...")
         logging.info(f"🔍 [MART] Creating {table} monthly advertising spend table...")
-        client.create_table(table)
+        bigquery_client.create_table(table)
         print(f"✅ [MART] Successfully created {table} monthly advertising spend table.")
         logging.info(f"✅ [MART] Successfully created {table} monthly advertising spend table.")
 
@@ -264,7 +278,7 @@ def mart_recon_all():
     try:
         print(f"🔁 [MART] Executing aggregation query to create {output_table_spend} monthly advertising spend table...")
         logging.info(f"🔁 [MART] Executing aggregation query to create {output_table_spend} monthly advertising spend table...")
-        client.query(query_monthly).result()
+        bigquery_client.query(query_monthly).result()
         logging.info(f"✅ [MART] Successfully created materialized table {output_table_spend} for monthly advertising spend.")
         print(f"✅ [MART] Successfully created materialized table {output_table_spend} for monthly advertising spend.")
     except Exception as e:
@@ -273,7 +287,7 @@ def mart_recon_all():
         return
 
     # 2.1.4. Build and execute reconciliation query
-    input_dataset_budget = f"{COMPANY}_dataset_budget_gspread_mart"
+    input_dataset_budget = f"{COMPANY}_dataset_budget_api_mart"
     input_table_budget = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_all_monthly"
     output_dataset_recon = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
     output_table_recon = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_ads_recon_all"
@@ -404,7 +418,7 @@ def mart_recon_all():
     try:
         print(f"🔁 [MART] Executing aggregation query to create {output_table_recon} reconciled advertising spend table...")
         logging.info(f"🔁 [MART] Executing aggregation query to create {output_table_recon} reconciled advertising spend table...")
-        client.query(query_recon).result()
+        bigquery_client.query(query_recon).result()
         logging.info(f"✅ [MART] Successfully created materialized table {output_table_recon} for reconciled advertising spend.")
         print(f"✅ [MART] Successfully created materialized table {output_table_recon} for reconciled advertising spend.")
     except Exception as e:

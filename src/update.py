@@ -30,25 +30,31 @@ import logging
 
 # Add internal Ads module for data handling
 
-from services.ads.mart import (
+from src.mart import (
     mart_recon_all,
     mart_spend_all,
 )
 
-# Get Google Cloud Project ID environment variable
-PROJECT = os.getenv("GCP_PROJECT_ID")
-
-# Get Facebook service environment variable for Brand
+# Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
 
-# Get Facebook service environment variable for Platform
+# Get environment variable for Google Cloud Project ID
+PROJECT = os.getenv("PROJECT")
+
+# Get environment variable for Platform
 PLATFORM = os.getenv("PLATFORM")
 
-# Get Facebook service environment variable for Account
+# Get environmetn variable for Department
+DEPARTMENT = os.getenv("DEPARTMENT")
+
+# Get environment variable for Account
 ACCOUNT = os.getenv("ACCOUNT")
 
-# Get Facebook service environment variable for Layer
+# Get nvironment variable for Layer
 LAYER = os.getenv("LAYER")
+
+# Get environment variable for Mode
+MODE = os.getenv("MODE")
 
 # 1. UPDATE UNIFIED ADVERTISING SPEND ACROSS MULTIPLE NETWORKS
 
@@ -62,12 +68,10 @@ def update_spend_all():
     logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified advertising spend across multiple networks for {COMPANY} company...")
     try:
         result = mart_spend_all()
-        print(f"✅ [UPDATE] Successfully rebuilt materialized table for unified advertising spend across multiple networks for {COMPANY} company.")
-        logging.info(f"✅ [UPDATE] Successfully rebuilt materialized table for unified advertising spend across multiple networks {COMPANY} company.")
         return result
     except Exception as e:
-        print(f"❌ [UPDATE] Failed to rebuild materialized table for unified advertising spend across multiple networks for {COMPANY} company due to {e}.")
-        logging.error(f"❌ [UPDATE] Failed to rebuild materialized table for unified advertising spend across multiple networks for {COMPANY} company due to {e}.")
+        print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company due to {e}.")
+        logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company due to {e}.")
         raise
 
 # 2. UPDATE BUDGET ALLOCATION AND ADVERTISING SPEND RECONCILIATION
@@ -76,12 +80,17 @@ def update_spend_all():
 def update_recon_all():
     print(f"🚀 [UPDATE] Starting monthly budget allocation and advertising reconciliation for {COMPANY} company...")
     logging.info(f"🚀 [UPDATE] Starting monthly budget allocation and advertising reconciliation for {COMPANY} company...")
+    
+    # 2.1.1. Update materialized table for unified advertising spend across multiple networks
     try:
+        print(f"🔄 [UPDATE] Triggering to rebuild materialized table for monthly budget allocation and advertising reconciliation for {COMPANY} company...")
+        logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for monthly budget allocation and advertising reconciliation for {COMPANY} company...")
         result = mart_recon_all()
-        print(f"✅ [UPDATE] Successfully rebuilt materialized table for monthly budget allocation and advertising reconciliation for {COMPANY} company.")
-        logging.info(f"✅ [UPDATE] Successfully rebuilt materialized table for monthly budget allocation and advertising reconciliation for {COMPANY} company.")
         return result
     except Exception as e:
-        print(f"❌ [UPDATE] Failed to rebuild materialized table for monthly budget allocation and advertising reconciliation for {COMPANY} company due to {e}.")
-        logging.error(f"❌ [UPDATE] Failed to rebuild materialized table for monthly budget allocation and advertising reconciliation for {COMPANY} company due to {e}.")
+        print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for monthly budget allocation and advertising reconciliation for {COMPANY} company due to {e}.")
+        logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for monthly budget allocation and advertising reconciliation for {COMPANY} company due to {e}.")
         raise
+
+if __name__ == "__main__":
+    update_spend_all()

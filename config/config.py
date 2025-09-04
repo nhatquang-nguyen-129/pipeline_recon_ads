@@ -1,7 +1,6 @@
-#services/ads/config.py
 """
 ===========================================================================
-ADS CONFIGURATION MODULE
+RECONCILIATION CONFIGURATION MODULE
 ---------------------------------------------------------------------------
 This module defines all **cross-platform Ads configurations** used  
 for aggregating advertising spend from multiple sources (Facebook,  
