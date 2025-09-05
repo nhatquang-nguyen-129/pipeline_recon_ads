@@ -94,3 +94,4 @@ def update_recon_all():
 
 if __name__ == "__main__":
     update_spend_all()
+    update_recon_all()

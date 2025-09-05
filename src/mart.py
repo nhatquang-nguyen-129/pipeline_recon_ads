@@ -39,12 +39,6 @@ from google.auth.exceptions import DefaultCredentialsError
 # Add Google Cloud libraries for integration
 from google.cloud import bigquery
 
-# Add internal Ads module for data handling
-from config.config import (
-    MAPPING_ADS_DATASET, 
-    MAPPING_ADS_NETWORK
-)
-
 # Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
 
@@ -78,19 +72,22 @@ def mart_spend_all():
         bigquery_client = bigquery.Client(project=PROJECT)
     except DefaultCredentialsError as e:
         raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
+    networks = ["facebook",
+                "tiktok",
+                "google"]
     valid_source_tables = []
-    for network in MAPPING_ADS_NETWORK:
+    for network in networks:
         try:
             print(f"🔍 [MART] Scanning for {network} materialized dataset for advertising spend unification...")
             logging.warning(f"🔍 [MART] Scanning for {network} materialized dataset for advertising spend unification...")
-            dataset_mart = MAPPING_ADS_DATASET[COMPANY]["mart"][network]
+            mart_dataset = f"{COMPANY}_dataset_{network}_api_mart"
             print(f"✅ [MART] Successfully retrieved {network} materialized dataset for advertising spend unification.")
             logging.warning(f"✅ [MART] Successfully retrieved {network} materialized dataset for advertising spend unification.")
         except KeyError:
             print(f"⚠️ [MART] Materialized dataset for {network} not found then unification is skipped.")
             logging.warning(f"⚠️ [MART] Materialized dataset for {network} not found then unification is skipped.")
             continue
-        source_table = f"{PROJECT}.{dataset_mart}.{COMPANY}_table_{network}_spend_all"
+        source_table = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{network}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
         try:
             print(f"🔍 [MART] Scanning for {network} materialized advertising spend table...")
             logging.warning(f"🔍 [MART] Scanning for {network} materialized advertising spend table...")
@@ -105,7 +102,7 @@ def mart_spend_all():
         print("❌ [MART] Failed to unify advertising spend due to no valid source tables found.")
         logging.error("❌ [MART] Failed to unify advertising spend due to no valid source tables found.")
         return
-    output_table = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_spend_all"
+    output_table = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
     print(f"🔍 [MART] Preparing to build {output_table} unified advertising spend table...")
     logging.info(f"🔍 [MART] Preparing to build {output_table} unified advertising spend table...")
 
@@ -129,7 +126,7 @@ def mart_spend_all():
             bigquery.SchemaField("trang_thai","STRING"),
             bigquery.SchemaField("ngay", "DATE"),
             bigquery.SchemaField("nhan_su", "STRING"),
-            bigquery.SchemaField("so_tien_thuc_tieu", "FLOAT"),
+            bigquery.SchemaField("chi_tieu", "FLOAT"),
         ]
         table = bigquery.Table(output_table, schema=schema)
         table.time_partitioning = bigquery.TimePartitioning(field="ngay")
@@ -141,7 +138,22 @@ def mart_spend_all():
         logging.info(f"✅ [MART] Successfully created {table} unified advertising spend table.")
 
     # 1.1.3. Query all input table(s) to build materialized table for unified advertising spend 
-    union_sql = "\nUNION ALL\n".join([f"SELECT * FROM `{tbl}`" for tbl in valid_source_tables])
+    union_sql = "\nUNION ALL\n".join([
+        f"""
+        SELECT
+            nen_tang,
+            ma_ngan_sach_cap_1,
+            chuong_trinh,
+            noi_dung,
+            hinh_thuc,
+            thang,
+            trang_thai,
+            ngay,
+            nhan_su,
+            chi_tieu
+        FROM `{tbl}`
+        """ for tbl in valid_source_tables
+    ])
     query = f"""
         CREATE OR REPLACE TABLE `{output_table}`
         PARTITION BY ngay
@@ -171,17 +183,20 @@ def mart_recon_all():
         bigquery_client = bigquery.Client(project=PROJECT)
     except DefaultCredentialsError as e:
         raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
+    networks = ["facebook",
+                "tiktok",
+                "google"]
     valid_source_tables = []
-    for network in MAPPING_ADS_NETWORK:
+    for network in networks:
         try:
-            input_dataset_spend = MAPPING_ADS_DATASET[COMPANY]["mart"][network]
+            input_dataset_spend = f"{COMPANY}_dataset_{network}_api_mart"
             print(f"🔍 [MART] Scanning for {network} materialized dataset {input_dataset_spend} for advertising spend reconciliation...")
             logging.warning(f"🔍 [MART] Scanning for {network} materialized dataset {input_dataset_spend} for advertising spend reconciliation...")
         except KeyError:
             print(f"⚠️ [MART] Materialized dataset for {network} not found then reconciliation is skipped.")
             logging.warning(f"⚠️ [MART] Materialized dataset for {network} not found then reconciliation is skipped.")
             continue
-        input_table = f"{PROJECT}.{input_dataset_spend}.{COMPANY}_table_{network}_spend_all"
+        input_table = f"{PROJECT}.{input_dataset_spend}.{COMPANY}_table_{network}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
         try:
             print(f"🔍 [MART] Scanning for {network} materialized advertising spend table for advertising spend reconciliation...")
             logging.warning(f"🔍 [MART] Scanning for {network} materialized advertising spend table for advertising spend reconciliation...")
@@ -198,7 +213,7 @@ def mart_recon_all():
         return
 
     # 2.1.2. Update existing monthly advertising spend table or create new table if it not exist
-    output_table_spend = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_spend_monthly"
+    output_table_spend = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
     print(f"🔍 [MART] Preparing to build {output_table_spend} monthly advertising spend table...")
     logging.info(f"🔍 [MART] Preparing to build {output_table_spend} monthly advertising spend table...")
     try:
@@ -217,7 +232,7 @@ def mart_recon_all():
             bigquery.SchemaField("thang", "STRING"),
             bigquery.SchemaField("nhan_su", "STRING"),
             bigquery.SchemaField("trang_thai", "STRING"),
-            bigquery.SchemaField("so_tien_thuc_tieu", "FLOAT"),
+            bigquery.SchemaField("chi_tieu", "FLOAT"),
         ]
         table = bigquery.Table(output_table_spend, schema=schema)
         table.clustering_fields = ["ma_ngan_sach_cap_1", "chuong_trinh", "nhan_su", "thang"]
@@ -238,7 +253,7 @@ def mart_recon_all():
             hinh_thuc, 
             thang, 
             nhan_su, 
-            chi_tieu AS so_tien_thuc_tieu,
+            chi_tieu,
             LOWER(trang_thai) AS trang_thai
         FROM `{tbl}`
         WHERE chi_tieu > 0
@@ -256,7 +271,7 @@ def mart_recon_all():
             thang,
             nhan_su,
             trang_thai,
-            so_tien_thuc_tieu
+            chi_tieu
         )
         SELECT 
             nen_tang, 
@@ -271,7 +286,7 @@ def mart_recon_all():
                     THEN 'active'
                 ELSE 'paused'
             END AS trang_thai,
-            SUM(so_tien_thuc_tieu) AS so_tien_thuc_tieu
+            SUM(chi_tieu) AS chi_tieu
         FROM ({union_sql})
         GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su;
     """
@@ -288,9 +303,9 @@ def mart_recon_all():
 
     # 2.1.4. Build and execute reconciliation query
     input_dataset_budget = f"{COMPANY}_dataset_budget_api_mart"
-    input_table_budget = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_all_monthly"
+    input_table_budget = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
     output_dataset_recon = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
-    output_table_recon = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_ads_recon_all"
+    output_table_recon = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_all"
     query_recon = f"""
         CREATE OR REPLACE TABLE `{output_table_recon}`
         CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, noi_dung, thang AS
@@ -310,9 +325,9 @@ def mart_recon_all():
                 COALESCE(b.thang, c.thang) AS thang,
                 b.* EXCEPT(ma_ngan_sach_cap_1, chuong_trinh, noi_dung, nen_tang, hinh_thuc, thang),
                 c.nhan_su,
-                c.so_tien_thuc_tieu,
+                c.chi_tieu,
                 c.trang_thai,
-                SAFE_DIVIDE(c.so_tien_thuc_tieu, b.ngan_sach_thuc_chi) AS spending_ratio,
+                SAFE_DIVIDE(c.chi_tieu, b.ngan_sach_thuc_chi) AS spending_ratio,
                 DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) AS days_running,
                 DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) AS total_days
             FROM budget b
@@ -328,11 +343,11 @@ def mart_recon_all():
             *,
             CASE
                 WHEN COALESCE(ngan_sach_thuc_chi, 0) = 0
-                    AND COALESCE(so_tien_thuc_tieu, 0) = 0
+                    AND COALESCE(chi_tieu, 0) = 0
                 THEN "🚫 No Budget"    
                 
                 WHEN COALESCE(ngan_sach_thuc_chi,0) = 0
-                    AND COALESCE(so_tien_thuc_tieu,0) > 0
+                    AND COALESCE(chi_tieu,0) > 0
                 THEN CASE 
                         WHEN LOWER(COALESCE(trang_thai,"")) = 'active' THEN "⚠️ Spend without Budget (Running)" 
                         ELSE "⚪ Spend without Budget (Stopped)" 
@@ -340,74 +355,74 @@ def mart_recon_all():
 
                 WHEN COALESCE(ngan_sach_thuc_chi, 0) > 0
                     AND CURRENT_DATE() < thoi_gian_bat_dau
-                    AND COALESCE(so_tien_thuc_tieu, 0) = 0
+                    AND COALESCE(chi_tieu, 0) = 0
                 THEN "🕓 Not Yet Started"                     
 
                 WHEN COALESCE(ngan_sach_thuc_chi, 0) > 0
                     AND CURRENT_DATE() >= thoi_gian_bat_dau
-                    AND COALESCE(so_tien_thuc_tieu, 0) = 0
+                    AND COALESCE(chi_tieu, 0) = 0
                     AND DATE_DIFF(CURRENT_DATE(), thoi_gian_bat_dau, DAY) <= 3
                 THEN "⚪ Not Set"
 
                 WHEN COALESCE(ngan_sach_thuc_chi, 0) > 0
                     AND CURRENT_DATE() >= thoi_gian_bat_dau
-                    AND COALESCE(so_tien_thuc_tieu, 0) = 0
+                    AND COALESCE(chi_tieu, 0) = 0
                     AND DATE_DIFF(CURRENT_DATE(), thoi_gian_bat_dau, DAY) > 3
                 THEN "⚠️ Delay"                
 
                 WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
                     AND CURRENT_DATE() < thoi_gian_bat_dau
-                    AND COALESCE(so_tien_thuc_tieu,0) > 0
+                    AND COALESCE(chi_tieu,0) > 0
                 THEN CASE 
                         WHEN LOWER(COALESCE(trang_thai,"")) != 'active' THEN "⚪ Early Spend (Stopped)" 
                         ELSE "⚠️ Early Spend (Running)" 
                     END
 
                 WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND SAFE_DIVIDE(so_tien_thuc_tieu, ngan_sach_thuc_chi) < 0.95
+                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) < 0.95
                     AND DATE_DIFF(thoi_gian_ket_thuc, thoi_gian_bat_dau, DAY) > 0
-                    AND SAFE_DIVIDE(so_tien_thuc_tieu, ngan_sach_thuc_chi) < SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), thoi_gian_bat_dau, DAY), DATE_DIFF(thoi_gian_ket_thuc, thoi_gian_bat_dau, DAY)) - 0.3
+                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) < SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), thoi_gian_bat_dau, DAY), DATE_DIFF(thoi_gian_ket_thuc, thoi_gian_bat_dau, DAY)) - 0.3
                 THEN CASE 
                         WHEN LOWER(COALESCE(trang_thai,"")) != 'active' THEN "⚪ Inactive" 
                         ELSE "⚠️ Low Spend" 
                     END
 
                 WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND SAFE_DIVIDE(so_tien_thuc_tieu, ngan_sach_thuc_chi) < 0.95
+                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) < 0.95
                     AND DATE_DIFF(thoi_gian_ket_thuc, thoi_gian_bat_dau, DAY) > 0
-                    AND SAFE_DIVIDE(so_tien_thuc_tieu, ngan_sach_thuc_chi) > SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), thoi_gian_bat_dau, DAY), DATE_DIFF(thoi_gian_ket_thuc, thoi_gian_bat_dau, DAY)) + 0.3
+                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) > SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), thoi_gian_bat_dau, DAY), DATE_DIFF(thoi_gian_ket_thuc, thoi_gian_bat_dau, DAY)) + 0.3
                 THEN CASE 
                         WHEN LOWER(COALESCE(trang_thai,"")) != 'active' THEN "⚪ Inactive" 
                         ELSE "⚠️ High Spend" 
                     END
 
                 WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND SAFE_DIVIDE(so_tien_thuc_tieu, ngan_sach_thuc_chi) BETWEEN 0.95 AND 0.99
+                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) BETWEEN 0.95 AND 0.99
                 THEN CASE 
                         WHEN LOWER(COALESCE(trang_thai,"")) != 'active' THEN "⚪ Inactive" 
                         ELSE "🟢 Near Completion" 
                     END
 
                 WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND SAFE_DIVIDE(so_tien_thuc_tieu, ngan_sach_thuc_chi) > 0.99
-                    AND so_tien_thuc_tieu < ngan_sach_thuc_chi * 1.01
+                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) > 0.99
+                    AND chi_tieu < ngan_sach_thuc_chi * 1.01
                 THEN CASE 
                         WHEN LOWER(COALESCE(trang_thai,"")) = 'active' THEN "⚠️ Completed but Running"
                         ELSE "🔵 Completed"
                     END
 
                 WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND so_tien_thuc_tieu >= ngan_sach_thuc_chi * 1.01
+                    AND chi_tieu >= ngan_sach_thuc_chi * 1.01
                     AND LOWER(COALESCE(trang_thai,"")) = 'active'
                 THEN "🔴 Over Budget but Running"
 
                 WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND so_tien_thuc_tieu >= ngan_sach_thuc_chi * 1.01
+                    AND chi_tieu >= ngan_sach_thuc_chi * 1.01
                     AND LOWER(COALESCE(trang_thai,"")) != 'active'
                 THEN "⚪ Over Budget and Stopped"
 
                 WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND COALESCE(so_tien_thuc_tieu,0) > 0
+                    AND COALESCE(chi_tieu,0) > 0
                     AND LOWER(COALESCE(trang_thai,"")) = 'active'
                 THEN "🟢 In Progress"
 
@@ -426,4 +441,5 @@ def mart_recon_all():
         print(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
 
 if __name__ == "__main__":
+    mart_spend_all()
     mart_recon_all()
