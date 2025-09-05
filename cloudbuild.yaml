@@ -1,6 +1,6 @@
 substitutions:
   _REGION: asia-southeast1
-  _IMAGE: asia-southeast1-docker.pkg.dev/seer-digital-ads/pipeline_budget_ads/v0.0.1
+  _IMAGE: asia-southeast1-docker.pkg.dev/seer-digital-ads/artifact-repository-budget/v0.0.1
 
 steps:
   - name: 'gcr.io/cloud-builders/docker'
