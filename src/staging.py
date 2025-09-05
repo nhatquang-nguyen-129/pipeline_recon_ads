@@ -202,8 +202,3 @@ def staging_budget_allocation():
     except Exception as e:
         print(f"❌ [STAGING] Faild to unify staging budget allocation due to {e}.")
         logging.error(f"❌ [STAGING] Faild to unify staging budget allocation due to {e}.")
-
-
-if __name__ == "__main__":
-    staging_budget_allocation()
-

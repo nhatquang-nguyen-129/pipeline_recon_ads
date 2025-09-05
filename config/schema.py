@@ -121,8 +121,3 @@ def ensure_table_schema(df: pd.DataFrame, schema_type: str) -> pd.DataFrame:
             logging.warning(f"⚠️ Column '{col}' cannot be coerced to {dtype}: {e}")
     df = df[[col for col in expected_columns]]
     return df
-
-
-
-
-

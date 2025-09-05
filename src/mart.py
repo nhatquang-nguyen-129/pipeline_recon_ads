@@ -61,26 +61,32 @@ MODE = os.getenv("MODE")
 def mart_budget_all():
     print("🚀 [MART] Starting to build materialized table(s) for monthly budget allocation...")
     logging.info("🚀 [MART] Starting to build materialized table(s) for monthly budget allocation...")
-
+    
+    # 1.1.1. Define id(s)
     try:
-        # 1.1.1. Prepare BigQuery client
-        try:
-            bigquery_client = bigquery.Client(project=PROJECT)
-        except DefaultCredentialsError as e:
-            raise RuntimeError("❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
-
-        # 1.1.2. Define datasets and base tables
         staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_staging"
         staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
         mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
-
-        # ------------------------
-        # 1.2. Create ALL mart table
-        # ------------------------
         mart_table_all = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
-        print(f"🔍 [MART] Building ALL mart table {mart_table_all} from {staging_table}...")
-        logging.info(f"🔍 [MART] Building ALL mart table {mart_table_all} from {staging_table}...")
-
+        print(f"🔍 [MART] Preparing to build materialized {mart_table_all} table for monthly budget allocation...")
+        logging.info(f"🔍 [MART] Preparing to build materialized {mart_table_all} table for monthly budget allocation...")
+    
+    # 1.1.2. Initialize Google BigQuery client
+        try:
+            print(f"🔍 [MART] Initializing Google BigQuery client for project {PROJECT}...")
+            logging.info(f"🔍 [MART] Initializing Google BigQuery client for project {PROJECT}...")
+            bigquery_client = bigquery.Client(project=PROJECT)
+            print(f"✅ [MART] Successfully initialized Google BigQuery client for {PROJECT}.")
+            logging.info(f"✅ [MART] Successfully initialized Google BigQuery client for {PROJECT}.")
+        except DefaultCredentialsError as e:
+            raise RuntimeError(f"❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
+        except Exception as e:
+            print(f"❌ [MART] Failed to initialize Google BigQuery client due to {str(e)}.")
+            logging.error(f"❌ [MART] Failed to initialize Google BigQuery client due to {str(e)}.")
+    
+    # 1.1.3. Create materialized table for montly budget allocation
+        print(f"🔄 [MART] Querying staging budget allocation {staging_table} table for monthly budget allocation creation...")
+        logging.info(f"🔄 [MART] Querying staging budget allocation {staging_table} table for monthly budget allocation creation...")
         query_all = f"""
             CREATE OR REPLACE TABLE `{mart_table_all}` AS
             SELECT
@@ -108,51 +114,42 @@ def mart_budget_all():
                 ngan_sach_khac
             FROM `{staging_table}`
         """
-        bigquery_client.query(query_all).result()
-
-        # Count rows in ALL mart table
-        count_all = list(bigquery_client.query(
-            f"SELECT COUNT(1) AS row_count FROM `{mart_table_all}`"
-        ).result())[0]["row_count"]
-        print(f"✅ [MART] Created ALL mart table {mart_table_all} with {count_all} row(s).")
-        logging.info(f"✅ [MART] Created ALL mart table {mart_table_all} with {count_all} row(s).")
-
-        # ------------------------
-        # 1.3. Create mart tables per (phong_ban, tai_khoan)
-        # ------------------------
+        try:
+            bigquery_client.query(query_all).result()
+            count_all = list(bigquery_client.query(
+                f"SELECT COUNT(1) AS row_count FROM `{mart_table_all}`"
+            ).result())[0]["row_count"]
+            print(f"✅ [MART] Successfully created materialized table {mart_table_all} with {count_all} row(s) for monthly budget allocation.")
+            logging.info(f"✅ [MART] Successfully created materialized table {mart_table_all} with {count_all} row(s) for monthly budget allocation.")
+        except Exception as e:
+            print(f"❌ [MART] Failed to build materialized table {mart_table_all} for monthly budget allocation due to {e}.")
+            logging.warning(f"❌ [MART] Failed to build materialized table {mart_table_all} for monthly budget allocation due to {e}.") 
+    
+    # 1.1.4. Create materialized table for distinct key(s)
+        print(f"🔄 [MART] Querying staging budget allocation {staging_table} table for distinct budget allocation table(s) creation...")
+        logging.info(f"🔄 [MART] Querying staging budget allocation {staging_table} table for distinct budget allocation table(s) creation...")
         distinct_query = f"""
             SELECT DISTINCT phong_ban, tai_khoan
             FROM `{staging_table}`
             WHERE phong_ban IS NOT NULL AND tai_khoan IS NOT NULL
         """
         distinct_pairs = bigquery_client.query(distinct_query).result()
-
         for row in distinct_pairs:
             phong_ban = row["phong_ban"]
             tai_khoan = row["tai_khoan"]
-            table_name = f"{COMPANY}_table_{PLATFORM}_{phong_ban}_{tai_khoan}_allocation_monthly"
-            mart_table = f"{PROJECT}.{mart_dataset}.{table_name}"
-
-            print(f"🔍 [MART] Building mart table {mart_table}...")
-            logging.info(f"🔍 [MART] Building mart table {mart_table}...")
-
+            mart_table_distinct = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_{phong_ban}_{tai_khoan}_allocation_monthly"
             query = f"""
-                CREATE OR REPLACE TABLE `{mart_table}` AS
+                CREATE OR REPLACE TABLE `{mart_table_distinct}` AS
                 SELECT *
                 FROM `{staging_table}`
                 WHERE phong_ban = '{phong_ban}' AND tai_khoan = '{tai_khoan}'
             """
             bigquery_client.query(query).result()
-
             count = list(bigquery_client.query(
-                f"SELECT COUNT(1) AS row_count FROM `{mart_table}`"
+                f"SELECT COUNT(1) AS row_count FROM `{mart_table_distinct}`"
             ).result())[0]["row_count"]
-            print(f"✅ [MART] Created mart table {mart_table} with {count} row(s).")
-            logging.info(f"✅ [MART] Created mart table {mart_table} with {count} row(s).")
-
+            print(f"✅ [MART] Successfully created materialized table {mart_table_distinct} with {count} row(s).")
+            logging.info(f"✅ [MART] Successfully created materialized table {mart_table_distinct} with {count} row(s).")
     except Exception as e:
-        print(f"❌ [MART] Failed to build mart tables for budget allocation due to {e}.")
-        logging.error(f"❌ [MART] Failed to build mart tables for budget allocation due to {e}.")
-
-if __name__ == "__main__":
-    mart_budget_all()
+        print(f"❌ [MART] Failed to build materialized table(s) for budget allocation due to {e}.")
+        logging.error(f"❌ [MART] Failed to build materialized table(s) for budget allocation due to {e}.")

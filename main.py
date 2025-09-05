@@ -63,7 +63,7 @@ if not all([COMPANY, PLATFORM, ACCOUNT, LAYER, MODE]):
 
 # 1. DYNAMIC IMPORT MODULE BASED ON PLATFORM
 try:
-    update_module = importlib.import_module(f"services.{PLATFORM}.update")
+    update_module = importlib.import_module(f"src.update")
 except ModuleNotFoundError:
     raise ImportError(f"❌ [MAIN] Platform '{PLATFORM}' is not supported so please ensure src/update.py exists.")
 

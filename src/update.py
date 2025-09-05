@@ -41,9 +41,6 @@ from google.api_core.exceptions import NotFound
 # Add Google Spreadsheets API libraries for integration
 import gspread
 
-# Add Google CLoud libraries for integration
-from google.cloud import bigquery
-
 # Add Google Secret Manager libraries for integration
 from google.cloud import secretmanager
 
@@ -52,13 +49,6 @@ import re
 
 # Add Python 'time' library for tracking execution time and implementing delays
 import time
-
-# Add Python 'datetime' library for datetime manipulation and timezone handling
-from datetime import (
-    datetime,
-    timedelta,
-    timezone
-)
 
 # Add internal Budget service for data handling
 from src.ingest import ingest_budget_allocation
@@ -95,17 +85,15 @@ def update_budget_allocation(thang: str) -> None:
     print(f"🚀 [UPDATE] Starting to update budget allocation for {thang}...")
     logging.info(f"🚀 [UPDATE] Starting to update budget allocation for {thang}...")
 
+    # 1.1.1. Start timing the update process
     start_time = time.time()
-    year, month = thang.split("-")
-
-    # 1.1. Lấy sheet_id từ Secret Manager
+    
+    # 1.1.2. Initialize Google Sheets client
     secret_client = secretmanager.SecretManagerServiceClient()
     secret_id = f"{COMPANY}_secret_{DEPARTMENT}_{PLATFORM}_sheet_id_{ACCOUNT}"
     secret_name = f"projects/{PROJECT}/secrets/{secret_id}/versions/latest"
     response = secret_client.access_secret_version(request={"name": secret_name})
     sheet_id = response.payload.data.decode("UTF-8")
-
-    # 1.2. Khởi tạo Google Sheets client
     try:
         scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
         creds, _ = default(scopes=scopes)
@@ -114,56 +102,69 @@ def update_budget_allocation(thang: str) -> None:
         sh = gc.open_by_key(sheet_id)
         worksheet_list = [ws.title for ws in sh.worksheets()]
     except Exception as e:
-        raise RuntimeError(f"❌ [UPDATE] Failed to init Google Sheets client due to {e}")
+        raise RuntimeError(f"❌ [UPDATE] Failed to init Google Sheets client due to {e}.")
 
-    # 1.3. Xác định sheet monthly + special
-    worksheet_monthly = f"m{int(month):02d}{year}"  # dạng mMMYYYY
-    pattern_special = re.compile(rf".*{year}$")     # dạng fesYYYY, snYYYY...
+    # 1.1.3. Prepare id(s)
+    year, month = thang.split("-")
+    worksheet_monthly = f"m{int(month):02d}{year}"
+    pattern_special = re.compile(rf".*{year}$")
     monthly_sheets = [ws for ws in worksheet_list if ws == worksheet_monthly]
     special_sheets = [ws for ws in worksheet_list if pattern_special.match(ws) and not ws.startswith("m")]
 
-    # 2. Ingest monthly budget
+    # 1.1.4. Ingest monthly budget
     df_monthly = None
     if monthly_sheets:
-        print(f"🔄 [UPDATE] Ingesting monthly budget sheet {worksheet_monthly}...")
-        df_monthly = ingest_budget_allocation(sheet_id, worksheet_monthly, thang) \
-            .query("thang == @thang")  # lọc đúng tháng
-        print(f"✅ [UPDATE] Loaded {len(df_monthly)} row(s) from monthly {worksheet_monthly} for {thang}.")
-
-    # 3. Ingest special budgets (full load, lọc theo thang trong data)
+        try:
+            print(f"🔄 [UPDATE] Triggering to ingest monthly budget allocation sheet {worksheet_monthly}...")
+            logging.info(f"🔄 [UPDATE] Triggering to ingest monthly budget allocation sheet {worksheet_monthly}...")
+            df_monthly = ingest_budget_allocation(sheet_id, worksheet_monthly, thang) \
+                .query("thang == @thang")
+        except Exception as e:
+            print(f"❌ [UPDATE] Failed to trigger monthly budget allocation sheet {worksheet_monthly} due to {e}.")
+            logging.error(f"❌ [UPDATE] Failed to trigger monthly budget allocation sheet {worksheet_monthly} due to {e}.")
+    # 1.1.5. Ingest special budget
     df_specials = []
     for ws in special_sheets:
-        print(f"🔄 [UPDATE] Ingesting special budget sheet {ws} (full load)...")
-        df_special = ingest_budget_allocation(sheet_id, ws, thang)
-        df_special = df_special.query("thang == @thang")
-        if len(df_special) > 0:
-            df_specials.append(df_special)
-            print(f"✅ [UPDATE] Loaded {len(df_special)} row(s) from special {ws} for {thang}.")
-        else:
-            print(f"⚠️ [UPDATE] No rows matched thang={thang} in special sheet {ws}.")
+        try:
+            print(f"🔄 [UPDATE] Triggering to ingest special budget allocation sheet {ws}...")
+            logging.info(f"🔄 [UPDATE] Triggering to ingest special budget allocation sheet {ws}...")            
+            df_special = ingest_budget_allocation(sheet_id, ws, thang)
+            df_special = df_special.query("thang == @thang")            
+            if len(df_special) > 0:
+                df_specials.append(df_special)
+            else:
+                print(f"⚠️ [UPDATE] No rows matched 'thang' to {thang} in special sheet {ws} then ingestion is skipped.")
+                logging.warning(f"⚠️ [UPDATE] No rows matched 'thang' to {thang} in special sheet {ws} then ingestion is skipped.")        
+        except Exception as e:
+            print(f"❌ [UPDATE] Failed to trigger special budget allocation sheet {ws} ingestion due to {e}.")
+            logging.error(f"❌ [UPDATE] Failed to ingest special budget sheet {ws} due to {e}.")
 
-    # 4. Rebuild staging + mart
+    # 1.1.6. Rebuild staging budget allocation table
     has_monthly = df_monthly is not None and len(df_monthly) > 0
     has_special = len(df_specials) > 0
-
     if has_monthly or has_special:
-        print("🔄 [UPDATE] Rebuilding staging & mart for budget allocation...")
-        staging_budget_allocation()
-        mart_budget_all()
-        print("✅ [UPDATE] Rebuilt staging & mart successfully.")
+        print("🔄 [UPDATE] Triggering to rebuild staging budget allocation table...")
+        logging.info("🔄 [UPDATE] Triggering to rebuild staging budget allocation table...")            
+        try:
+            staging_budget_allocation()
+        except Exception as e:
+            print(f"❌ [UPDATE] Failed to trigger staging table rebuild for budget allocation due to {e}.")
+            logging.error(f"❌ [UPDATE] Failed to trigger staging table rebuild for budget allocation due to {e}.")  
     else:
-        print(f"⚠️ [UPDATE] No data ingested for {thang}, skip staging & mart.")
+        print(f"⚠️ [UPDATE] No updates for {thang} in budget allocation then staging table rebuild is skipped.")
+        logging.warning(f"⚠️ [UPDATE] No updates for {thang} in budget allocation then staging table rebuild is skipped.")
 
+    # 1.1.7. Rebuild materialized budget allocation table
+    if has_monthly or has_special:
+        print("🔄 [UPDATE] Triggering to rebuild materialized budget allocation table...")
+        logging.info("🔄 [UPDATE] Triggering to rebuild materialized budget allocation table...")     
+        try:
+            mart_budget_all()
+        except Exception as e:
+            print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for budget allocation due to {e}.")
+            logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for budget allocation due to {e}.")          
+        
+    # 1.1.8. Measure the total execution time    
     elapsed = time.time() - start_time
     print(f"✅ [UPDATE] Completed budget allocation update for {thang} in {elapsed:.2f}s.")
     logging.info(f"✅ [UPDATE] Completed budget allocation update for {thang} in {elapsed:.2f}s.")
-
-if __name__ == "__main__":
-    import argparse
-    import os
-
-    parser = argparse.ArgumentParser(description="Facebook Ads Data Update CLI")
-    parser.add_argument("--thang", required=True, help="Start date in format YYYY-MM-DD")
-    args = parser.parse_args()
-
-    update_budget_allocation(args.thang)

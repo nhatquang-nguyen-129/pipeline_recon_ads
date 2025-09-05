@@ -228,15 +228,3 @@ def ingest_budget_allocation(
         logging.error(f"❌ [INGEST] Failed to load budget allocation into {table_id} due to {e}.")
         raise
     return df
-
-if __name__ == "__main__":
-    # Thông tin sheet muốn ingest
-    sheet_id = "1tWQ19_3cGFoCeYE5bG4P7OYPEz_qXZncAVojtmJ3Gd8"
-    worksheet_name = "m082025"  # tab cụ thể trên Google Sheet
-    thang = "2025-08"  # hardcode để test
-
-    ingest_budget_allocation(
-        sheet_id=sheet_id,
-        worksheet_name=worksheet_name,
-    )
-

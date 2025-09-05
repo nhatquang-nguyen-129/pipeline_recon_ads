@@ -67,6 +67,8 @@ def fetch_budget_allocation(gc, sheet_id: str, worksheet_name: str, selected_mon
 
     # 1.1.1. Call Google Sheets API
     try:
+        print(f"🔍 [FETCH] Retrieving {worksheet_name} in Google Sheets file {sheet_id} from Google Sheets API...")
+        logging.info(f"🔍 [FETCH] Retrieving {worksheet_name} in Google Sheets file {sheet_id} from Google Sheets API...")
         ws = gc.open_by_key(sheet_id).worksheet(worksheet_name)
         records = ws.get_all_records()
         print(f"✅ [FETCH] Retrieved {len(records)} row(s) from {worksheet_name} in Google Sheets file {sheet_id}.")
@@ -77,8 +79,8 @@ def fetch_budget_allocation(gc, sheet_id: str, worksheet_name: str, selected_mon
             return pd.DataFrame()
         df = pd.DataFrame(records).replace("", None)
     except Exception as e:
-        print(f"❌ [FETCH] Cannot fetch data from {worksheet_name} worksheet in {sheet_id} file due to {e}.")
-        logging.error(f"❌ [FETCH] Cannot fetch data from {worksheet_name} worksheet in {sheet_id} file due to {e}.")
+        print(f"❌ [FETCH] Failed to fetch data from {worksheet_name} worksheet in {sheet_id} file due to {e}.")
+        logging.error(f"❌ [FETCH] Failed to fetch data from {worksheet_name} worksheet in {sheet_id} file due to {e}.")
         return pd.DataFrame()
 
     # 1.1.2. Normalize column names to snake_case

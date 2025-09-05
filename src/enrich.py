@@ -141,5 +141,4 @@ def enrich_budget_fields(df: pd.DataFrame, table_id: str) -> pd.DataFrame:
     except Exception as e:
         print(f"⚠️ [ENRICH] Failed to enrich budget metadata: {e}")
         logging.warning(f"⚠️ [ENRICH] Failed to enrich budget metadata: {e}")
-
     return df
