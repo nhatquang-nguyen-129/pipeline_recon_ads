@@ -105,9 +105,10 @@ def ingest_budget_allocation(
         except Exception as e:
             raise RuntimeError(f"❌ [INGEST] Failed to initialize Google Sheets client due to {e}.") from e
         df = fetch_budget_allocation(gc, sheet_id, worksheet_name)
+        df = df[df["thang"].astype(str) == str(thang)]
         if df.empty:
-            print("⚠️ [INGEST] Empty budget allocation returned.")
-            logging.warning("⚠️ [INGEST] Empty budget allocation returned.")
+            print(f"⚠️ [INGEST] No records found for thang={thang} in worksheet {worksheet_name}.")
+            logging.warning(f"⚠️ [INGEST] No records found for thang={thang} in worksheet {worksheet_name}.")
             return df
     except Exception as e:
         print(f"❌ [INGEST] Failed to trigger budget allocation fetch for month {thang} due to {e}.")

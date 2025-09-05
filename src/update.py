@@ -54,7 +54,7 @@ import time
 from src.ingest import ingest_budget_allocation
 from src.staging import staging_budget_allocation
 from src.mart import (
-    mart_budget_all
+    mart_budget_allocation
 )
 
 # Get environment variable for Company
@@ -159,7 +159,7 @@ def update_budget_allocation(thang: str) -> None:
         print("🔄 [UPDATE] Triggering to rebuild materialized budget allocation table...")
         logging.info("🔄 [UPDATE] Triggering to rebuild materialized budget allocation table...")     
         try:
-            mart_budget_all()
+            mart_budget_allocation()
         except Exception as e:
             print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for budget allocation due to {e}.")
             logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for budget allocation due to {e}.")          

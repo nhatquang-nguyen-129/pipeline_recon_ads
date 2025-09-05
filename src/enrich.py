@@ -133,9 +133,9 @@ def enrich_budget_fields(df: pd.DataFrame, table_id: str) -> pd.DataFrame:
             table_name
         )
         if match:
-            df["phong_ban"] = match.group("department")
-            df["tai_khoan"] = match.group("account")
-            df["worksheet_name"] = match.group("worksheet")
+            df["department"] = match.group("department")
+            df["account"] = match.group("account")
+            df["worksheet"] = match.group("worksheet")
             print("✅ [ENRICH] Successfully enriched budget metadata from table_id.")
             logging.info("✅ [ENRICH] Successfully enriched budget metadata from table_id.")
     except Exception as e:
