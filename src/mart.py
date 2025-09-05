@@ -67,109 +67,119 @@ def mart_spend_all():
     print(f"🚀 [MART] Starting unified daily advertising spend aggregation for {COMPANY} company...")
     logging.info(f"🚀 [MART] Starting unified daily advertising spend aggregation for {COMPANY} company...")
 
-    # 1.1.1. Prepare full table_id for upper layer(s)
+    # 1.1.1. Initialize BigQuery client
     try:
         bigquery_client = bigquery.Client(project=PROJECT)
     except DefaultCredentialsError as e:
-        raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
-    networks = ["facebook",
-                "tiktok",
-                "google"]
-    valid_source_tables = []
+        raise RuntimeError("❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
+
+    # 1.1.2. Define advertising networks
+    networks = ["facebook", "tiktok", "google"]
+
+    # 1.1.3. Prepare valid source tables lists
+    valid_source_tables_all = []        # dùng để build bảng all_all
+    valid_source_tables_specific = []   # dùng để build bảng theo DEPARTMENT/ACCOUNT
+
+    # 1.1.4. Scan source tables for each network
     for network in networks:
         try:
             print(f"🔍 [MART] Scanning for {network} materialized dataset for advertising spend unification...")
-            logging.warning(f"🔍 [MART] Scanning for {network} materialized dataset for advertising spend unification...")
+            logging.info(f"🔍 [MART] Scanning for {network} materialized dataset for advertising spend unification...")
             mart_dataset = f"{COMPANY}_dataset_{network}_api_mart"
             print(f"✅ [MART] Successfully retrieved {network} materialized dataset for advertising spend unification.")
-            logging.warning(f"✅ [MART] Successfully retrieved {network} materialized dataset for advertising spend unification.")
+            logging.info(f"✅ [MART] Successfully retrieved {network} materialized dataset for advertising spend unification.")
         except KeyError:
             print(f"⚠️ [MART] Materialized dataset for {network} not found then unification is skipped.")
             logging.warning(f"⚠️ [MART] Materialized dataset for {network} not found then unification is skipped.")
             continue
-        source_table = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{network}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
+
+        # 1.1.4.1. Check all_all source table
+        source_table_all = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{network}_all_all_campaign_spend"
         try:
-            print(f"🔍 [MART] Scanning for {network} materialized advertising spend table...")
-            logging.warning(f"🔍 [MART] Scanning for {network} materialized advertising spend table...")
-            bigquery_client.get_table(source_table)
-            valid_source_tables.append(source_table)
-            print(f"✅ [MART] Successfully retrieved {source_table} materialized table for advertising spend unification.")
-            logging.warning(f"✅ [MART] Successfully retrieved {source_table} materialized table for advertising spend unification.")
+            bigquery_client.get_table(source_table_all)
+            valid_source_tables_all.append(source_table_all)
+            print(f"✅ [MART] Successfully retrieved {source_table_all} materialized table for all_all spend unification.")
+            logging.info(f"✅ [MART] Successfully retrieved {source_table_all} materialized table for all_all spend unification.")
         except NotFound:
-            print(f"⚠️ [MART] Source table {source_table} not found then unification is skipped.")
-            logging.warning(f"⚠️ [MART] Source table {source_table} not found then unification is skipped.")
-    if not valid_source_tables:
+            print(f"⚠️ [MART] Source table {source_table_all} not found then all_all unification is skipped.")
+            logging.warning(f"⚠️ [MART] Source table {source_table_all} not found then all_all unification is skipped.")
+
+        # 1.1.4.2. Check specific source table (DEPARTMENT/ACCOUNT)
+        source_table_specific = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{network}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
+        try:
+            bigquery_client.get_table(source_table_specific)
+            valid_source_tables_specific.append(source_table_specific)
+            print(f"✅ [MART] Successfully retrieved {source_table_specific} materialized table for pair-key spend unification.")
+            logging.info(f"✅ [MART] Successfully retrieved {source_table_specific} materialized table for pair-key spend unification.")
+        except NotFound:
+            print(f"⚠️ [MART] Source table {source_table_specific} not found then pair-key unification is skipped.")
+            logging.warning(f"⚠️ [MART] Source table {source_table_specific} not found then pair-key unification is skipped.")
+
+    # 1.1.5. Validate at least some sources exist
+    if not valid_source_tables_all and not valid_source_tables_specific:
         print("❌ [MART] Failed to unify advertising spend due to no valid source tables found.")
         logging.error("❌ [MART] Failed to unify advertising spend due to no valid source tables found.")
         return
-    output_table = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
-    print(f"🔍 [MART] Preparing to build {output_table} unified advertising spend table...")
-    logging.info(f"🔍 [MART] Preparing to build {output_table} unified advertising spend table...")
 
-    # 1.1.2. Update existing table or create new table if it not exist
-    try:
-        print(f"🔍 [MART] Checking {output_table} unified advertising spend table existence...")
-        logging.info(f"🔍 [MART] Checking {output_table} unified advertising spend table existence...")
-        bigquery_client.get_table(output_table)
-        print(f"✅ [MART] Successfully retrieved {output_table} unified advertising table existence.")
-        logging.info(f"✅ [MART] Successfully retrieved {output_table} unified advertising table existence.")
-    except NotFound:
-        print(f"⚠️ [MART] Unified advertising spend table {output_table} not found then table creation will be proceeding...")
-        logging.info(f"⚠️ [MART] Unified advertising spend table {output_table} not found then table creation will be proceeding...")
-        schema = [
-            bigquery.SchemaField("nen_tang", "STRING"),
-            bigquery.SchemaField("ma_ngan_sach_cap_1", "STRING"),
-            bigquery.SchemaField("chuong_trinh", "STRING"),
-            bigquery.SchemaField("noi_dung", "STRING"),
-            bigquery.SchemaField("hinh_thuc", "STRING"),
-            bigquery.SchemaField("thang", "STRING"),
-            bigquery.SchemaField("trang_thai","STRING"),
-            bigquery.SchemaField("ngay", "DATE"),
-            bigquery.SchemaField("nhan_su", "STRING"),
-            bigquery.SchemaField("chi_tieu", "FLOAT"),
-        ]
-        table = bigquery.Table(output_table, schema=schema)
-        table.time_partitioning = bigquery.TimePartitioning(field="ngay")
-        table.clustering_fields = ["ma_ngan_sach_cap_1", "chuong_trinh", "noi_dung", "nhan_su"]
-        print(f"🔍 [MART] Creating {table} unified advertising spend table...")
-        logging.info(f"🔍 [MART] Creating {table} unified advertising spend table...")
-        bigquery_client.create_table(table)
-        print(f"✅ [MART] Successfully created {table} unified advertising spend table.")
-        logging.info(f"✅ [MART] Successfully created {table} unified advertising spend table.")
+    # 1.2. Always build all_all unified advertising spend table
+    if valid_source_tables_all:
+        output_table_all = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_all_all_campaign_spend"
+        union_sql_all = "\nUNION ALL\n".join([
+            f"""
+            SELECT
+                nen_tang,
+                ma_ngan_sach_cap_1,
+                chuong_trinh,
+                noi_dung,
+                hinh_thuc,
+                thang,
+                trang_thai,
+                ngay,
+                nhan_su,
+                chi_tieu
+            FROM `{tbl}`
+            """ for tbl in valid_source_tables_all
+        ])
+        query_all = f"""
+            CREATE OR REPLACE TABLE `{output_table_all}`
+            PARTITION BY ngay
+            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang
+            AS
+            {union_sql_all}
+        """
+        bigquery_client.query(query_all).result()
+        print(f"✅ [MART] Successfully created materialized table {output_table_all} (all_all).")
+        logging.info(f"✅ [MART] Successfully created materialized table {output_table_all} (all_all).")
 
-    # 1.1.3. Query all input table(s) to build materialized table for unified advertising spend 
-    union_sql = "\nUNION ALL\n".join([
-        f"""
-        SELECT
-            nen_tang,
-            ma_ngan_sach_cap_1,
-            chuong_trinh,
-            noi_dung,
-            hinh_thuc,
-            thang,
-            trang_thai,
-            ngay,
-            nhan_su,
-            chi_tieu
-        FROM `{tbl}`
-        """ for tbl in valid_source_tables
-    ])
-    query = f"""
-        CREATE OR REPLACE TABLE `{output_table}`
-        PARTITION BY ngay
-        CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, noi_dung, nhan_su
-        AS
-        {union_sql}
-    """
-    try:
-        print(f"🔁 [MART] Executing aggregation query to create {output_table} unified advertising spend table...")
-        logging.info(f"🔁 [MART] Executing aggregation query to create {output_table} unified advertising spend table...")
-        bigquery_client.query(query).result()
-        logging.info(f"✅ [MART] Successfully created materialized table {output_table} for unified advertising spend.")
-        print(f"✅ [MART] Successfully created materialized table {output_table} for unified advertising spend.")
-    except Exception as e:
-        logging.error(f"❌ [MART] Failed to excute aggregation query to build unified advertising spend table due to {e}.")
-        print(f"❌ [MART] Failed to excute aggregation query to build unified advertising spend table due to {e}.")
+    # 1.3. If DEPARTMENT/ACCOUNT != all then build specific table
+    if not (DEPARTMENT == "all" and ACCOUNT == "all") and valid_source_tables_specific:
+        output_table_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
+        union_sql_specific = "\nUNION ALL\n".join([
+            f"""
+            SELECT
+                nen_tang,
+                ma_ngan_sach_cap_1,
+                chuong_trinh,
+                noi_dung,
+                hinh_thuc,
+                thang,
+                trang_thai,
+                ngay,
+                nhan_su,
+                chi_tieu
+            FROM `{tbl}`
+            """ for tbl in valid_source_tables_specific
+        ])
+        query_specific = f"""
+            CREATE OR REPLACE TABLE `{output_table_specific}`
+            PARTITION BY ngay
+            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang
+            AS
+            {union_sql_specific}
+        """
+        bigquery_client.query(query_specific).result()
+        print(f"✅ [MART] Successfully created materialized table {output_table_specific} (pair key).")
+        logging.info(f"✅ [MART] Successfully created materialized table {output_table_specific} (pair key).")
 
 # 2. BUILD MATERIALIZED TABLE FOR BUDGET ALLOCATION AND ADVERTISING SPEND RECONCILIATION
 
@@ -196,7 +206,7 @@ def mart_recon_all():
             print(f"⚠️ [MART] Materialized dataset for {network} not found then reconciliation is skipped.")
             logging.warning(f"⚠️ [MART] Materialized dataset for {network} not found then reconciliation is skipped.")
             continue
-        input_table = f"{PROJECT}.{input_dataset_spend}.{COMPANY}_table_{network}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
+        input_table = f"{PROJECT}.{input_dataset_spend}.{COMPANY}_table_{network}_all_all_campaign_spend"
         try:
             print(f"🔍 [MART] Scanning for {network} materialized advertising spend table for advertising spend reconciliation...")
             logging.warning(f"🔍 [MART] Scanning for {network} materialized advertising spend table for advertising spend reconciliation...")
@@ -213,34 +223,9 @@ def mart_recon_all():
         return
 
     # 2.1.2. Update existing monthly advertising spend table or create new table if it not exist
-    output_table_spend = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
-    print(f"🔍 [MART] Preparing to build {output_table_spend} monthly advertising spend table...")
-    logging.info(f"🔍 [MART] Preparing to build {output_table_spend} monthly advertising spend table...")
-    try:
-        print(f"🔍 [MART] Checking {output_table_spend} monthly advertising spend table existence...")
-        logging.info(f"🔍 [MART] Checking {output_table_spend} monthly advertising spend table existence...")
-        bigquery_client.get_table(output_table_spend)
-        print(f"✅ [MART] Successfully retrieved {output_table_spend} monthly advertising spend table existence.")
-        logging.info(f"✅ [MART] Successfully retrieved {output_table_spend} monthly advertising spend table existence.")
-    except NotFound:
-        schema = [
-            bigquery.SchemaField("nen_tang", "STRING"),
-            bigquery.SchemaField("ma_ngan_sach_cap_1", "STRING"),
-            bigquery.SchemaField("chuong_trinh", "STRING"),
-            bigquery.SchemaField("noi_dung", "STRING"),
-            bigquery.SchemaField("hinh_thuc", "STRING"),
-            bigquery.SchemaField("thang", "STRING"),
-            bigquery.SchemaField("nhan_su", "STRING"),
-            bigquery.SchemaField("trang_thai", "STRING"),
-            bigquery.SchemaField("chi_tieu", "FLOAT"),
-        ]
-        table = bigquery.Table(output_table_spend, schema=schema)
-        table.clustering_fields = ["ma_ngan_sach_cap_1", "chuong_trinh", "nhan_su", "thang"]
-        print(f"🔍 [MART] Creating {table} monthly advertising spend table...")
-        logging.info(f"🔍 [MART] Creating {table} monthly advertising spend table...")
-        bigquery_client.create_table(table)
-        print(f"✅ [MART] Successfully created {table} monthly advertising spend table.")
-        logging.info(f"✅ [MART] Successfully created {table} monthly advertising spend table.")
+    output_table_spend_all = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_all_all_campaign_spend"
+    print(f"🔍 [MART] Preparing to build {output_table_spend_all} monthly advertising spend table...")
+    logging.info(f"🔍 [MART] Preparing to build {output_table_spend_all} monthly advertising spend table...")
 
     # 2.1.3. Query all input table(s) to build materialized table for monthly advertising spend
     union_sql = " UNION ALL ".join([
@@ -260,19 +245,9 @@ def mart_recon_all():
         """ for tbl in valid_source_tables
     ])
 
-    query_monthly = f"""
-        TRUNCATE TABLE `{output_table_spend}`;
-        INSERT INTO `{output_table_spend}` (
-            nen_tang,
-            ma_ngan_sach_cap_1,
-            chuong_trinh,
-            noi_dung,
-            hinh_thuc,
-            thang,
-            nhan_su,
-            trang_thai,
-            chi_tieu
-        )
+    query_monthly_all = f"""
+        CREATE OR REPLACE TABLE `{output_table_spend_all}`
+        CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
         SELECT 
             nen_tang, 
             ma_ngan_sach_cap_1, 
@@ -290,155 +265,68 @@ def mart_recon_all():
         FROM ({union_sql})
         GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su;
     """
-    try:
-        print(f"🔁 [MART] Executing aggregation query to create {output_table_spend} monthly advertising spend table...")
-        logging.info(f"🔁 [MART] Executing aggregation query to create {output_table_spend} monthly advertising spend table...")
-        bigquery_client.query(query_monthly).result()
-        logging.info(f"✅ [MART] Successfully created materialized table {output_table_spend} for monthly advertising spend.")
-        print(f"✅ [MART] Successfully created materialized table {output_table_spend} for monthly advertising spend.")
-    except Exception as e:
-        logging.error(f"❌ [MART] Failed to excute aggregation query to build monthly advertising spend table due to {e}.")
-        print(f"❌ [MART] Failed to excute aggregation query to build monthly advertising spend table due to {e}.")
-        return
+    bigquery_client.query(query_monthly_all).result()
 
-    # 2.1.4. Build and execute reconciliation query
+    # 2.1.4. Build and execute reconciliation query for all_all
     input_dataset_budget = f"{COMPANY}_dataset_budget_api_mart"
-    input_table_budget = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
+    input_table_budget_all = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_all_all_allocation_monthly"
     output_dataset_recon = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
-    output_table_recon = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_all"
-    query_recon = f"""
-        CREATE OR REPLACE TABLE `{output_table_recon}`
-        CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, noi_dung, thang AS
+    output_table_recon_all = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_all_all_reconciliation_all"
+    query_recon_all = f"""
+        CREATE OR REPLACE TABLE `{output_table_recon_all}`
+        CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
         WITH budget AS (
-            SELECT * FROM `{input_table_budget}`
+            SELECT * FROM `{input_table_budget_all}`
         ),
         cost AS (
-            SELECT * FROM `{output_table_spend}`
-        ),
-        calc AS (
-            SELECT
-                COALESCE(b.ma_ngan_sach_cap_1, c.ma_ngan_sach_cap_1) AS ma_ngan_sach_cap_1,
-                COALESCE(b.chuong_trinh, c.chuong_trinh) AS chuong_trinh,
-                COALESCE(b.noi_dung, c.noi_dung) AS noi_dung,
-                COALESCE(b.nen_tang, c.nen_tang) AS nen_tang,
-                COALESCE(b.hinh_thuc, c.hinh_thuc) AS hinh_thuc,
-                COALESCE(b.thang, c.thang) AS thang,
-                b.* EXCEPT(ma_ngan_sach_cap_1, chuong_trinh, noi_dung, nen_tang, hinh_thuc, thang),
-                c.nhan_su,
-                c.chi_tieu,
-                c.trang_thai,
-                SAFE_DIVIDE(c.chi_tieu, b.ngan_sach_thuc_chi) AS spending_ratio,
-                DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) AS days_running,
-                DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) AS total_days
-            FROM budget b
-            FULL OUTER JOIN cost c
-            ON b.ma_ngan_sach_cap_1 = c.ma_ngan_sach_cap_1
-            AND b.chuong_trinh = c.chuong_trinh
-            AND b.noi_dung = c.noi_dung
-            AND COALESCE(b.nen_tang,"other") = COALESCE(c.nen_tang,"other")
-            AND COALESCE(b.hinh_thuc,"other") = COALESCE(c.hinh_thuc,"other")
-            AND b.thang = c.thang
+            SELECT * FROM `{output_table_spend_all}`
         )
-        SELECT
-            *,
-            CASE
-                WHEN COALESCE(ngan_sach_thuc_chi, 0) = 0
-                    AND COALESCE(chi_tieu, 0) = 0
-                THEN "🚫 No Budget"    
-                
-                WHEN COALESCE(ngan_sach_thuc_chi,0) = 0
-                    AND COALESCE(chi_tieu,0) > 0
-                THEN CASE 
-                        WHEN LOWER(COALESCE(trang_thai,"")) = 'active' THEN "⚠️ Spend without Budget (Running)" 
-                        ELSE "⚪ Spend without Budget (Stopped)" 
-                    END
-
-                WHEN COALESCE(ngan_sach_thuc_chi, 0) > 0
-                    AND CURRENT_DATE() < thoi_gian_bat_dau
-                    AND COALESCE(chi_tieu, 0) = 0
-                THEN "🕓 Not Yet Started"                     
-
-                WHEN COALESCE(ngan_sach_thuc_chi, 0) > 0
-                    AND CURRENT_DATE() >= thoi_gian_bat_dau
-                    AND COALESCE(chi_tieu, 0) = 0
-                    AND DATE_DIFF(CURRENT_DATE(), thoi_gian_bat_dau, DAY) <= 3
-                THEN "⚪ Not Set"
-
-                WHEN COALESCE(ngan_sach_thuc_chi, 0) > 0
-                    AND CURRENT_DATE() >= thoi_gian_bat_dau
-                    AND COALESCE(chi_tieu, 0) = 0
-                    AND DATE_DIFF(CURRENT_DATE(), thoi_gian_bat_dau, DAY) > 3
-                THEN "⚠️ Delay"                
-
-                WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND CURRENT_DATE() < thoi_gian_bat_dau
-                    AND COALESCE(chi_tieu,0) > 0
-                THEN CASE 
-                        WHEN LOWER(COALESCE(trang_thai,"")) != 'active' THEN "⚪ Early Spend (Stopped)" 
-                        ELSE "⚠️ Early Spend (Running)" 
-                    END
-
-                WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) < 0.95
-                    AND DATE_DIFF(thoi_gian_ket_thuc, thoi_gian_bat_dau, DAY) > 0
-                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) < SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), thoi_gian_bat_dau, DAY), DATE_DIFF(thoi_gian_ket_thuc, thoi_gian_bat_dau, DAY)) - 0.3
-                THEN CASE 
-                        WHEN LOWER(COALESCE(trang_thai,"")) != 'active' THEN "⚪ Inactive" 
-                        ELSE "⚠️ Low Spend" 
-                    END
-
-                WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) < 0.95
-                    AND DATE_DIFF(thoi_gian_ket_thuc, thoi_gian_bat_dau, DAY) > 0
-                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) > SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), thoi_gian_bat_dau, DAY), DATE_DIFF(thoi_gian_ket_thuc, thoi_gian_bat_dau, DAY)) + 0.3
-                THEN CASE 
-                        WHEN LOWER(COALESCE(trang_thai,"")) != 'active' THEN "⚪ Inactive" 
-                        ELSE "⚠️ High Spend" 
-                    END
-
-                WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) BETWEEN 0.95 AND 0.99
-                THEN CASE 
-                        WHEN LOWER(COALESCE(trang_thai,"")) != 'active' THEN "⚪ Inactive" 
-                        ELSE "🟢 Near Completion" 
-                    END
-
-                WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND SAFE_DIVIDE(chi_tieu, ngan_sach_thuc_chi) > 0.99
-                    AND chi_tieu < ngan_sach_thuc_chi * 1.01
-                THEN CASE 
-                        WHEN LOWER(COALESCE(trang_thai,"")) = 'active' THEN "⚠️ Completed but Running"
-                        ELSE "🔵 Completed"
-                    END
-
-                WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND chi_tieu >= ngan_sach_thuc_chi * 1.01
-                    AND LOWER(COALESCE(trang_thai,"")) = 'active'
-                THEN "🔴 Over Budget but Running"
-
-                WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND chi_tieu >= ngan_sach_thuc_chi * 1.01
-                    AND LOWER(COALESCE(trang_thai,"")) != 'active'
-                THEN "⚪ Over Budget and Stopped"
-
-                WHEN COALESCE(ngan_sach_thuc_chi,0) > 0
-                    AND COALESCE(chi_tieu,0) > 0
-                    AND LOWER(COALESCE(trang_thai,"")) = 'active'
-                THEN "🟢 In Progress"
-
-                ELSE "❓ Not Recognized"
-            END AS trang_thai_chien_dich
-        FROM calc
+        SELECT * FROM budget FULL OUTER JOIN cost
+        USING (ma_ngan_sach_cap_1, chuong_trinh, noi_dung, nen_tang, hinh_thuc, thang)
     """
     try:
-        print(f"🔁 [MART] Executing aggregation query to create {output_table_recon} reconciled advertising spend table...")
-        logging.info(f"🔁 [MART] Executing aggregation query to create {output_table_recon} reconciled advertising spend table...")
-        bigquery_client.query(query_recon).result()
-        logging.info(f"✅ [MART] Successfully created materialized table {output_table_recon} for reconciled advertising spend.")
-        print(f"✅ [MART] Successfully created materialized table {output_table_recon} for reconciled advertising spend.")
+        print(f"🔁 [MART] Executing aggregation query to create {output_table_recon_all} reconciled advertising spend table...")
+        logging.info(f"🔁 [MART] Executing aggregation query to create {output_table_recon_all} reconciled advertising spend table...")
+        bigquery_client.query(query_recon_all).result()
+        logging.info(f"✅ [MART] Successfully created materialized table {output_table_recon_all} for reconciled advertising spend.")
+        print(f"✅ [MART] Successfully created materialized table {output_table_recon_all} for reconciled advertising spend.")
     except Exception as e:
         logging.error(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
         print(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
+
+    # 2.1.5. If DEPARTMENT/ACCOUNT != all then build specific tables
+    if not (DEPARTMENT == "all" and ACCOUNT == "all"):
+        output_table_spend_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
+        query_monthly_specific = f"""
+            CREATE OR REPLACE TABLE `{output_table_spend_specific}`
+            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
+            SELECT * FROM `{output_table_spend_all}`
+        """
+        bigquery_client.query(query_monthly_specific).result()
+
+        input_table_budget_specific = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
+        output_table_recon_specific = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_all"
+        query_recon_specific = f"""
+            CREATE OR REPLACE TABLE `{output_table_recon_specific}`
+            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
+            WITH budget AS (
+                SELECT * FROM `{input_table_budget_specific}`
+            ),
+            cost AS (
+                SELECT * FROM `{output_table_spend_specific}`
+            )
+            SELECT * FROM budget FULL OUTER JOIN cost
+            USING (ma_ngan_sach_cap_1, chuong_trinh, noi_dung, nen_tang, hinh_thuc, thang)
+        """    
+        try:
+            print(f"🔁 [MART] Executing aggregation query to create {output_table_recon_specific} reconciled advertising spend table...")
+            logging.info(f"🔁 [MART] Executing aggregation query to create {output_table_recon_specific} reconciled advertising spend table...")
+            bigquery_client.query(query_recon_specific).result()
+            logging.info(f"✅ [MART] Successfully created materialized table {output_table_recon_specific} for reconciled advertising spend.")
+            print(f"✅ [MART] Successfully created materialized table {output_table_recon_specific} for reconciled advertising spend.")
+        except Exception as e:
+            logging.error(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
+            print(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
 
 if __name__ == "__main__":
     mart_spend_all()

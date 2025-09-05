@@ -63,7 +63,7 @@ if not all([COMPANY, PLATFORM, ACCOUNT, LAYER, MODE]):
 
 # 1. DYNAMIC IMPORT MODULE BASED ON PLATFORM
 try:
-    update_module = importlib.import_module(f"services.{PLATFORM}.update")
+    update_module = importlib.import_module(f"src.update")
 except ModuleNotFoundError:
     raise ImportError(f"❌ [MAIN] Platform '{PLATFORM}' is not supported so please ensure services/{PLATFORM}/update.py exists.")
 
@@ -71,75 +71,8 @@ except ModuleNotFoundError:
 def main():
     today = datetime.today()
 
-    # 1.2.1. PLATFORM = facebook (keep original logic)
-    if PLATFORM == "facebook":
-        try:
-            update_campaign_insights = update_module.update_campaign_insights
-            update_ad_insights = update_module.update_ad_insights
-        except AttributeError:
-            raise ImportError(f"❌ [MAIN] Facebook update module must define update_campaign_insights and update_ad_insights.")
-        layers = [layer.strip() for layer in LAYER.split(",") if layer.strip()]
-        if len(layers) != 1:
-            raise ValueError("⚠️ [MAIN] Only one layer is supported per execution so please run separately for each layer.")
-        if MODE == "today":
-            start_date = end_date = today.strftime("%Y-%m-%d")
-        elif MODE == "last3days":
-            start = today - timedelta(days=3)
-            start_date = start.strftime("%Y-%m-%d")
-            end_date = today.strftime("%Y-%m-%d")
-        elif MODE == "last7days":
-            start = today - timedelta(days=7)
-            start_date = start.strftime("%Y-%m-%d")
-            end_date = today.strftime("%Y-%m-%d")
-        elif MODE == "thismonth":
-            start = today.replace(day=1)
-            start_date = start.strftime("%Y-%m-%d")
-            end_date = today.strftime("%Y-%m-%d")
-        elif MODE == "lastmonth":
-            first_day_this_month = today.replace(day=1)
-            last_day_last_month = first_day_this_month - timedelta(days=1)
-            first_day_last_month = last_day_last_month.replace(day=1)
-            start_date = first_day_last_month.strftime("%Y-%m-%d")
-            end_date = last_day_last_month.strftime("%Y-%m-%d")
-        else:
-            raise ValueError(f"⚠️ [MAIN] Unsupported mode {MODE} so please re-check input environment variable.")
-        if "campaign" in layers:
-            print(f"🚀 [MAIN] Starting to update {PLATFORM} campaign insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}...")
-            logging.info(f"🚀 [MAIN] Starting to update {PLATFORM} campaign insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}...")
-            update_campaign_insights(start_date=start_date, end_date=end_date)
-            print(f"✅ [MAIN] Successfully completed update {PLATFORM} campaign insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}.")
-            logging.info(f"✅ [MAIN] Successfully completed update {PLATFORM} campaign insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}.")
-        if "ad" in layers:
-            print(f"🚀 [MAIN] Starting to update {PLATFORM} ad insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}...")
-            logging.info(f"🚀 [MAIN] Starting to update {PLATFORM} ad insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}...")
-            update_ad_insights(start_date=start_date, end_date=end_date)
-            print(f"✅ [MAIN] Successfully completed update {PLATFORM} ad insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}.")
-            logging.info(f"✅ [MAIN] Successfully completed update {PLATFORM} ad insights of {COMPANY} in {MODE} mode and {layers} layer from {start_date} to {end_date}.")
-
-    # 1.2.2. PLATFORM = budget
-    elif PLATFORM == "budget":
-        try:
-            update_budget_allocation = update_module.update_budget_allocation
-        except AttributeError:
-            raise ImportError(f"❌ [MAIN] Budget update module must define 'update_budget_allocation'.")
-        if MODE == "thismonth":
-            thang = today.strftime("%Y-%m")   # e.g. "2025-08"
-        elif MODE == "lastmonth":
-            first_day_this_month = today.replace(day=1)
-            last_day_last_month = first_day_this_month - timedelta(days=1)
-            thang = last_day_last_month.strftime("%Y-%m")   # e.g. "2025-07"
-        else:
-            raise ValueError(f"⚠️ [MAIN] Unsupported mode {MODE} for budget. Use thismonth or lastmonth.")
-        if LAYER != "all":
-            raise ValueError("⚠️ [MAIN] Budget only supports LAYER=all.")
-        print(f"🚀 [MAIN] Starting to update budget allocation of {COMPANY} for {thang}...")
-        logging.info(f"🚀 [MAIN] Starting to update budget allocation of {COMPANY} for {thang}...")
-        update_budget_allocation(thang)
-        print(f"✅ [MAIN] Successfully completed update budget allocation of {COMPANY} for {thang}.")
-        logging.info(f"✅ [MAIN] Successfully completed update budget allocation of {COMPANY} for {thang}.")
-
-     # 1.2.3. PLATFORM = ads
-    elif PLATFORM == "ads":
+     # 1.2.3. PLATFORM = recon
+    if PLATFORM == "recon":
         try:
             update_spend = update_module.update_spend_all
             update_recon = update_module.update_recon_all
