@@ -61,7 +61,7 @@ MODE = os.getenv("MODE")
 # 1. FETCH BUDGET SHEETS FOR FACT TABLES
 
 # 1.1. Fetch all valid worksheets (excluding filters)
-def fetch_budget_allocation(gc, sheet_id: str, worksheet_name: str, selected_month: str | None = None) -> pd.DataFrame:
+def fetch_budget_allocation(gc, sheet_id: str, worksheet_name: str | None = None) -> pd.DataFrame:
     print(f"🚀 [FETCH] Fetching budget allocation from {worksheet_name} sheet in {sheet_id} file...")
     logging.info(f"🚀 [FETCH] Fetching budget allocation from {worksheet_name} sheet in {sheet_id} file...")
 
