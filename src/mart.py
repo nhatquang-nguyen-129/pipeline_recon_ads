@@ -181,6 +181,106 @@ def mart_spend_all():
         print(f"✅ [MART] Successfully created materialized table {output_table_specific} (pair key).")
         logging.info(f"✅ [MART] Successfully created materialized table {output_table_specific} (pair key).")
 
+def mart_spend_monthly():
+    print(f"🚀 [MART] Starting unified monthly advertising spend aggregation for {COMPANY} company...")
+    logging.info(f"🚀 [MART] Starting unified monthly advertising spend aggregation for {COMPANY} company...")
+
+    try:
+        bigquery_client = bigquery.Client(project=PROJECT)
+    except DefaultCredentialsError as e:
+        raise RuntimeError("❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
+
+    networks = ["facebook", "tiktok", "google"]
+
+    valid_source_tables_all = []
+    valid_source_tables_specific = []
+
+    # 1. Scan daily source tables
+    for network in networks:
+        mart_dataset = f"{COMPANY}_dataset_{network}_api_mart"
+
+        source_table_all = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{network}_all_all_campaign_spend"
+        try:
+            bigquery_client.get_table(source_table_all)
+            valid_source_tables_all.append(source_table_all)
+        except NotFound:
+            continue
+
+        source_table_specific = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{network}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
+        try:
+            bigquery_client.get_table(source_table_specific)
+            valid_source_tables_specific.append(source_table_specific)
+        except NotFound:
+            continue
+
+    if not valid_source_tables_all and not valid_source_tables_specific:
+        print("❌ [MART] No valid daily source tables found for monthly aggregation.")
+        logging.error("❌ [MART] No valid daily source tables found for monthly aggregation.")
+        return
+
+    # 2. Build all_all monthly spend
+    if valid_source_tables_all:
+        output_table_all = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_all_all_campaign_spend_monthly"
+        # Drop trước để tránh conflict partition spec
+        bigquery_client.query(f"DROP TABLE IF EXISTS `{output_table_all}`").result()
+        union_sql_all = "\nUNION ALL\n".join([
+            f"""
+            SELECT
+                nen_tang,
+                ma_ngan_sach_cap_1,
+                chuong_trinh,
+                noi_dung,
+                hinh_thuc,
+                thang,
+                nhan_su,
+                LOWER(trang_thai) AS trang_thai,
+                SUM(chi_tieu) AS chi_tieu
+            FROM `{tbl}`
+            GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su, trang_thai
+            """ for tbl in valid_source_tables_all
+        ])
+
+        query_all = f"""
+            CREATE TABLE `{output_table_all}`
+            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang
+            AS
+            {union_sql_all}
+        """
+        bigquery_client.query(query_all).result()
+        print(f"✅ [MART] Successfully created monthly table {output_table_all} (all_all).")
+
+    # 3. Build specific monthly spend
+    if not (DEPARTMENT == "all" and ACCOUNT == "all") and valid_source_tables_specific:
+        output_table_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend_monthly"
+
+        bigquery_client.query(f"DROP TABLE IF EXISTS `{output_table_specific}`").result()
+
+        union_sql_specific = "\nUNION ALL\n".join([
+            f"""
+            SELECT
+                nen_tang,
+                ma_ngan_sach_cap_1,
+                chuong_trinh,
+                noi_dung,
+                hinh_thuc,
+                thang,
+                nhan_su,
+                LOWER(trang_thai) AS trang_thai,
+                SUM(chi_tieu) AS chi_tieu
+            FROM `{tbl}`
+            GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su, trang_thai
+            """ for tbl in valid_source_tables_specific
+        ])
+
+        query_specific = f"""
+            CREATE TABLE `{output_table_specific}`
+            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang
+            AS
+            {union_sql_specific}
+        """
+        bigquery_client.query(query_specific).result()
+        print(f"✅ [MART] Successfully created monthly table {output_table_specific} (pair key).")
+
 # 2. BUILD MATERIALIZED TABLE FOR BUDGET ALLOCATION AND ADVERTISING SPEND RECONCILIATION
 
 # 2.1 Build materialized table for monthly budget allocation and advertising spend reconciliation
