@@ -84,16 +84,16 @@ def main():
             last_day_last_month = first_day_this_month - timedelta(days=1)
             thang = last_day_last_month.strftime("%Y-%m")
         else:
-            raise ValueError(f"⚠️ [MAIN] Unsupported mode {MODE} for budget. Use thismonth or lastmonth.")
+            raise ValueError(f"⚠️ [MAIN] Unsupported mode {MODE} for budget and use 'thismonth' or 'lastmonth' instead.")
         if LAYER != "all":
-            raise ValueError("⚠️ [MAIN] Budget only supports LAYER=all.")
+            raise ValueError(f"⚠️ [MAIN] Unsupported layer {LAYER} for budget and use 'all' only.")
         try:
-            print(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} in {MODE} mode and {DEPARTMENT} for {thang}...")
-            logging.info(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} in {MODE} mode and {DEPARTMENT} for {thang}...")
+            print(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {thang} month...")
+            logging.info(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {thang} month...")
             update_budget_allocation(thang)
         except Exception as e:
-            print(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} in {MODE} mode and {DEPARTMENT} for {thang} due to {e}.")
-            logging.error(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} in {MODE} mode and {DEPARTMENT} for {thang} due to {e}.")
+            print(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {thang} month due to {e}.")
+            logging.error(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {thang} month due to {e}.")
 
 # 1.3. Entrypoint guard to run main() when this script is executed directly
 if __name__ == "__main__":

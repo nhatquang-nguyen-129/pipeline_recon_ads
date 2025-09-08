@@ -7,8 +7,8 @@ standardized metadata, mappings, and business logic to produce
 a clean, analysis-ready mart for downstream usage.
 
 It encapsulates data cleaning, normalization, and mapping steps 
-to ensure consistent keys across platforms (e.g. ma_chuong_trinh, 
-ma_noi_dung, ma_ngan_sach_cap_1), allowing seamless joins with 
+to ensure consistent keys across platforms (e.g. chuong_trinh, 
+noi_dung, ma_ngan_sach_cap_1), allowing seamless joins with 
 marketing performance data (e.g. Facebook, Google, TikTok).
 
 ✔️ Merges raw/staging budget data with dimension tables for unified identifiers  
@@ -109,14 +109,14 @@ def enrich_budget_fields(df: pd.DataFrame, table_id: str) -> pd.DataFrame:
         logging.warning("⚠️ [ENRICH] Budget column 'nen_tang' not found then standardization is skipped.")
 
     # 2.1.2. Add composite key for join
-    required_cols = {"ma_chuong_trinh", "ma_noi_dung", "month"}
+    required_cols = {"chuong_trinh", "noi_dung", "thang"}
     print(f"🔍 [ENRICH] Adding budget composite key {required_cols}...")
     logging.info(f"🔍 [ENRICH] Adding budget composite key {required_cols}...")
     if required_cols.issubset(df.columns):
         df["budget_key"] = (
-            df["ma_chuong_trinh"].str.strip().str.upper() + "__" +
-            df["ma_noi_dung"].str.strip().str.upper() + "__" +
-            df["month"]
+            df["chuong_trinh"].str.strip().str.upper() + "__" +
+            df["noi_dung"].str.strip().str.upper() + "__" +
+            df["thang"]
         )
         print(f"✅ [ENRICH] Successfully created composite key {required_cols}.")
         logging.info(f"✅ [ENRICH] Successfully created composite key {required_cols}.")

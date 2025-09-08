@@ -83,17 +83,21 @@ def staging_budget_allocation():
         print(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for budget allocation...")
         logging.info(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for budget allocation...")
 
-    # 1.1.2. Scan all raw budget allocation table(s)
+        # 1.1.2. Scan all raw budget allocation table(s)
         print("🔍 [STAGING] Scanning all raw budget allocation table(s)...")
         logging.info("🔍 [STAGING] Scanning all raw budget allocation table(s)...")
         tables = client.list_tables(f"{PROJECT}.{raw_dataset}")
-        raw_tables = [table.table_id for table in tables]
+        raw_tables = [
+            table.table_id for table in tables 
+            if re.match(r"^.*_allocation_[a-zA-Z0-9_]+$", table.table_id)
+        ]
         if not raw_tables:
             print(f"⚠️ [STAGING] No raw budget allocation table(s) found for {COMPANY} company then staging is skipped.")
             logging.warning(f"⚠️ [STAGING] No raw budget allocation table(s) found for {COMPANY} company then staging is skipped.")
             return
-        print(f"✅ [STAGING] Successfully found {len(raw_tables)} raw budget table(s) for {COMPANY} company.")
-        logging.info(f"✅ [STAGING] Successfully found {len(raw_tables)} raw budget table(s) for {COMPANY} company.")
+        print(f"✅ [STAGING] Successfully found {len(raw_tables)} raw budget table(s) for {COMPANY} company: {raw_tables}")
+        logging.info(f"✅ [STAGING] Successfully found {len(raw_tables)} raw budget table(s) for {COMPANY} company: {raw_tables}")
+
 
     # 1.1.3. Query raw budget table(s)
         all_dfs = []
