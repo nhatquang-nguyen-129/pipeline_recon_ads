@@ -31,8 +31,9 @@ import logging
 # Add internal Ads module for data handling
 
 from src.mart import (
-    mart_recon_all,
     mart_spend_all,
+    mart_aggregate_all,
+    mart_recon_all,
 )
 
 # Get environment variable for Company
@@ -74,6 +75,22 @@ def update_spend_all():
         logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company due to {e}.")
         raise
 
+# 1.2. Update unified advertising spend across multiple networks
+def update_aggregate_all():
+    print(f"🚀 [UPDATE] Starting unified monthly advertising spend aggregation for {COMPANY} company...")
+    logging.info(f"🚀 [UPDATE] Starting unified monthly advertising spend aggregation for {COMPANY} company...")
+    
+    # 1.1.1. Rebuild materialized table for unified advertising spend across multiple networks
+    print(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified monthly advertising spend across multiple networks for {COMPANY} company...")
+    logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified monthly advertising spend across multiple networks for {COMPANY} company...")
+    try:
+        result = mart_aggregate_all()
+        return result
+    except Exception as e:
+        print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company due to {e}.")
+        logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company due to {e}.")
+        raise
+
 # 2. UPDATE BUDGET ALLOCATION AND ADVERTISING SPEND RECONCILIATION
 
 # 2.1. Update materialized table for monthly budget allocation and advertising spend reconciliation
@@ -91,7 +108,3 @@ def update_recon_all():
         print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for monthly budget allocation and advertising reconciliation for {COMPANY} company due to {e}.")
         logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for monthly budget allocation and advertising reconciliation for {COMPANY} company due to {e}.")
         raise
-
-if __name__ == "__main__":
-    update_spend_all()
-    update_recon_all()

@@ -71,18 +71,23 @@ except ModuleNotFoundError:
 def main():
     today = datetime.today()
 
-     # 1.2.3. PLATFORM = recon
+    # 1.2.3. PLATFORM = recon
     if PLATFORM == "recon":
         try:
             update_spend = update_module.update_spend_all
             update_recon = update_module.update_recon_all
+            update_aggregate = update_module.update_aggregate_all
         except AttributeError:
-            raise ImportError(f"❌ [MAIN] Ads update module must define 'mart_spend_all' and 'mart_recon_all'.")
+            raise ImportError(
+                f"❌ [MAIN] Ads update module must define 'mart_spend_all', 'mart_recon_all', and 'mart_aggregate_all'."
+            )
+
         layers = [layer.strip() for layer in LAYER.split(",") if layer.strip()]
         if len(layers) != 1:
-            raise ValueError("⚠️ [MAIN] Ads only supports one LAYER per execution (spend or recon).")
+            raise ValueError("⚠️ [MAIN] Ads only supports one LAYER per execution (spend, recon, or aggregate).")
         if MODE != "all":
             raise ValueError("⚠️ [MAIN] Ads only supports MODE=all.")
+
         layer = layers[0]
         if layer == "spend":
             print(f"🚀 [MAIN] Starting to build unified ads spend mart for {COMPANY}...")
@@ -96,8 +101,14 @@ def main():
             update_recon()
             print(f"✅ [MAIN] Successfully built unified ads spend reconciliation mart for {COMPANY}.")
             logging.info(f"✅ [MAIN] Successfully built unified ads spend reconciliation mart for {COMPANY}.")
+        elif layer == "aggregate":
+            print(f"🚀 [MAIN] Starting to build unified ads aggregate mart for {COMPANY}...")
+            logging.info(f"🚀 [MAIN] Starting to build unified ads aggregate mart for {COMPANY}...")
+            update_aggregate()
+            print(f"✅ [MAIN] Successfully built unified ads aggregate mart for {COMPANY}.")
+            logging.info(f"✅ [MAIN] Successfully built unified ads aggregate mart for {COMPANY}.")
         else:
-            raise ValueError(f"⚠️ [MAIN] Unsupported ads LAYER={layer}. Use spend or recon.")
+            raise ValueError(f"⚠️ [MAIN] Unsupported ads LAYER={layer}. Use spend, recon, or aggregate.")
 
 # 1.3. Entrypoint guard to run main() when this script is executed directly
 if __name__ == "__main__":
