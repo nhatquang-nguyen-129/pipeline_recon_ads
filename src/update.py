@@ -33,7 +33,7 @@ import logging
 from src.mart import (
     mart_spend_all,
     mart_aggregate_all,
-    mart_recon_all,
+    mart_recon_all
 )
 
 # Get environment variable for Company
