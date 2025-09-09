@@ -155,22 +155,44 @@ def mart_spend_all():
     # 1.1.6. If DEPARTMENT/ACCOUNT != all then build specific table
     if not (DEPARTMENT == "all" and ACCOUNT == "all") and valid_source_tables_specific:
         output_table_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
-        union_sql_specific = "\nUNION ALL\n".join([
-            f"""
-            SELECT
-                nen_tang,
-                ma_ngan_sach_cap_1,
-                chuong_trinh,
-                noi_dung,
-                hinh_thuc,
-                thang,
-                trang_thai,
-                ngay,
-                nhan_su,
-                chi_tieu
-            FROM `{tbl}`
-            """ for tbl in valid_source_tables_specific
-        ])
+
+        # Nếu là marketing + supplier thì build thêm supplier_name
+        if DEPARTMENT == "marketing" and ACCOUNT == "supplier":
+            union_sql_specific = "\nUNION ALL\n".join([
+                f"""
+                SELECT
+                    nen_tang,
+                    ma_ngan_sach_cap_1,
+                    chuong_trinh,
+                    noi_dung,
+                    hinh_thuc,
+                    thang,
+                    trang_thai,
+                    ngay,
+                    nhan_su,
+                    chi_tieu,
+                    supplier_name
+                FROM `{tbl}`
+                """ for tbl in valid_source_tables_specific
+            ])
+        else:
+            union_sql_specific = "\nUNION ALL\n".join([
+                f"""
+                SELECT
+                    nen_tang,
+                    ma_ngan_sach_cap_1,
+                    chuong_trinh,
+                    noi_dung,
+                    hinh_thuc,
+                    thang,
+                    trang_thai,
+                    ngay,
+                    nhan_su,
+                    chi_tieu
+                FROM `{tbl}`
+                """ for tbl in valid_source_tables_specific
+            ])
+
         query_specific = f"""
             CREATE OR REPLACE TABLE `{output_table_specific}`
             PARTITION BY ngay
@@ -178,6 +200,7 @@ def mart_spend_all():
             AS
             {union_sql_specific}
         """
+
         print(f"🔄 [MART] Querying all campaign spend table(s) to build materialized table {output_table_specific}...")
         logging.info(f"🔄 [MART] Querying all campaign spend table(s) to build materialized table {output_table_specific}...")
         bigquery_client.query(query_specific).result()
@@ -236,25 +259,50 @@ def mart_aggregate_all():
         try:
             bigquery_client.get_table(source_table_specific)
             output_table_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_aggregation_spend"
-            query_specific = f"""
-                CREATE OR REPLACE TABLE `{output_table_specific}`
-                CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
-                SELECT
-                    nen_tang,
-                    ma_ngan_sach_cap_1,
-                    chuong_trinh,
-                    noi_dung,
-                    hinh_thuc,
-                    thang,
-                    nhan_su,
-                    CASE
-                        WHEN COUNTIF(LOWER(trang_thai) = 'active') > 0 THEN 'active'
-                        ELSE 'inactive'
-                    END AS trang_thai,
-                    SUM(chi_tieu) AS chi_tieu
-                FROM `{source_table_specific}`
-                GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su
-            """
+
+            # Nếu là marketing + supplier thì build thêm supplier_name
+            if DEPARTMENT == "marketing" and ACCOUNT == "supplier":
+                query_specific = f"""
+                    CREATE OR REPLACE TABLE `{output_table_specific}`
+                    CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
+                    SELECT
+                        nen_tang,
+                        ma_ngan_sach_cap_1,
+                        chuong_trinh,
+                        noi_dung,
+                        hinh_thuc,
+                        thang,
+                        nhan_su,
+                        supplier_name,
+                        CASE
+                            WHEN COUNTIF(LOWER(trang_thai) = 'active') > 0 THEN 'active'
+                            ELSE 'inactive'
+                        END AS trang_thai,
+                        SUM(chi_tieu) AS chi_tieu
+                    FROM `{source_table_specific}`
+                    GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su, supplier_name
+                """
+            else:
+                query_specific = f"""
+                    CREATE OR REPLACE TABLE `{output_table_specific}`
+                    CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
+                    SELECT
+                        nen_tang,
+                        ma_ngan_sach_cap_1,
+                        chuong_trinh,
+                        noi_dung,
+                        hinh_thuc,
+                        thang,
+                        nhan_su,
+                        CASE
+                            WHEN COUNTIF(LOWER(trang_thai) = 'active') > 0 THEN 'active'
+                            ELSE 'inactive'
+                        END AS trang_thai,
+                        SUM(chi_tieu) AS chi_tieu
+                    FROM `{source_table_specific}`
+                    GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su
+                """
+
             print(f"🔄 [MART] Aggregating daily spend into monthly table {output_table_specific}...")
             logging.info(f"🔄 [MART] Aggregating daily spend into monthly table {output_table_specific}...")
             bigquery_client.query(query_specific).result()
