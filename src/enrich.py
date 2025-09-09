@@ -101,7 +101,7 @@ def enrich_budget_fields(df: pd.DataFrame, table_id: str) -> pd.DataFrame:
     if "nen_tang" in df.columns:
         print("🔍 [ENRICH] Standardizing budget platform classification by 'nen_tang'...")
         logging.info("🔍 [ENRICH] Standardizing budget platform classification by 'nen_tang'...")          
-        df["platform"] = df["nen_tang"].astype(str).str.strip().str.lower()
+        df["nen_tang"] = df["nen_tang"].astype(str).str.strip().str.lower()
         print("✅ [ENRICH] Successfully standardized budget platform classification by 'nen_tang'.")
         logging.info("✅ [ENRICH] Successfully standardized budget platform classification by 'nen_tang'.")
     else:
