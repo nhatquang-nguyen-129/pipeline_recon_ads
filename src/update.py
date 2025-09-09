@@ -72,7 +72,6 @@ def update_recon_all():
         logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account....")
         try:
             result = mart_spend_all()
-            return result
         except Exception as e:
             print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
             logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
@@ -82,7 +81,6 @@ def update_recon_all():
         logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified monthly advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account....")
         try:
             result = mart_aggregate_all()
-            return result
         except Exception as e:
             print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
             logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
@@ -92,7 +90,6 @@ def update_recon_all():
             print(f"🔄 [UPDATE] Triggering to rebuild materialized table for monthly budget allocation and advertising reconciliation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account...")
             logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for monthly budget allocation and advertising reconciliation for for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account...")
             result = mart_recon_all()
-            return result
         except Exception as e:
             print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for monthly budget allocation and advertising reconciliation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
             logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for monthly budget allocation and advertising reconciliation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
@@ -104,3 +101,5 @@ def update_recon_all():
 
     print(f"✅ [UPDATE] Successfully completed materialized reconciliation update for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account.")
     logging.info(f"✅ [UPDATE] Successfully completed materialized reconciliation update for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account.")
+    
+    return result
