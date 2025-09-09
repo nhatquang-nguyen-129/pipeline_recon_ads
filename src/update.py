@@ -57,54 +57,50 @@ LAYER = os.getenv("LAYER")
 # Get environment variable for Mode
 MODE = os.getenv("MODE")
 
-# 1. UPDATE UNIFIED ADVERTISING SPEND ACROSS MULTIPLE NETWORKS
+# 1. UPDATE BUDGET ALLOCATION AND ADVERTISING SPEND RECONCILIATION
 
-# 1.1. Update unified advertising spend across multiple networks
-def update_spend_all():
-    print(f"🚀 [UPDATE] Starting unified daily advertising spend aggregation for {COMPANY} company...")
-    logging.info(f"🚀 [UPDATE] Starting unified daily advertising spend aggregation for {COMPANY} company...")
-    
-    # 1.1.1. Rebuild materialized table for unified advertising spend across multiple networks
-    print(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified advertising spend across multiple networks for {COMPANY} company...")
-    logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified advertising spend across multiple networks for {COMPANY} company...")
-    try:
-        result = mart_spend_all()
-        return result
-    except Exception as e:
-        print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company due to {e}.")
-        logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company due to {e}.")
-        raise
-
-# 1.2. Update unified advertising spend across multiple networks
-def update_aggregate_all():
-    print(f"🚀 [UPDATE] Starting unified monthly advertising spend aggregation for {COMPANY} company...")
-    logging.info(f"🚀 [UPDATE] Starting unified monthly advertising spend aggregation for {COMPANY} company...")
-    
-    # 1.1.1. Rebuild materialized table for unified advertising spend across multiple networks
-    print(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified monthly advertising spend across multiple networks for {COMPANY} company...")
-    logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified monthly advertising spend across multiple networks for {COMPANY} company...")
-    try:
-        result = mart_aggregate_all()
-        return result
-    except Exception as e:
-        print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company due to {e}.")
-        logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company due to {e}.")
-        raise
-
-# 2. UPDATE BUDGET ALLOCATION AND ADVERTISING SPEND RECONCILIATION
-
-# 2.1. Update materialized table for monthly budget allocation and advertising spend reconciliation
+# 1.1. Update materialized table for monthly budget allocation and advertising spend reconciliation
 def update_recon_all():
-    print(f"🚀 [UPDATE] Starting monthly budget allocation and advertising reconciliation for {COMPANY} company...")
-    logging.info(f"🚀 [UPDATE] Starting monthly budget allocation and advertising reconciliation for {COMPANY} company...")
+    print(f"🚀 [UPDATE] Starting monthly budget allocation and advertising reconciliation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account....")
+    logging.info(f"🚀 [UPDATE] Starting monthly budget allocation and advertising reconciliation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account....")
     
-    # 2.1.1. Update materialized table for unified advertising spend across multiple networks
+    result = None
     try:
-        print(f"🔄 [UPDATE] Triggering to rebuild materialized table for monthly budget allocation and advertising reconciliation for {COMPANY} company...")
-        logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for monthly budget allocation and advertising reconciliation for {COMPANY} company...")
-        result = mart_recon_all()
-        return result
+
+    # 1.1.1. Rebuild materialized table for unified advertising spend across multiple networks
+        print(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account...")
+        logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account....")
+        try:
+            result = mart_spend_all()
+            return result
+        except Exception as e:
+            print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
+            logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
+    
+    # 1.1.2. Rebuild materialized table for aggregated advertising spend across multiple networks
+        print(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified monthly advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account....")
+        logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for unified monthly advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account....")
+        try:
+            result = mart_aggregate_all()
+            return result
+        except Exception as e:
+            print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
+            logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for unified advertising spend across multiple networks for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
+
+    # 2.1.1. Update materialized table for unified advertising spend across multiple networks
+        try:
+            print(f"🔄 [UPDATE] Triggering to rebuild materialized table for monthly budget allocation and advertising reconciliation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account...")
+            logging.info(f"🔄 [UPDATE] Triggering to rebuild materialized table for monthly budget allocation and advertising reconciliation for for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account...")
+            result = mart_recon_all()
+            return result
+        except Exception as e:
+            print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for monthly budget allocation and advertising reconciliation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
+            logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for monthly budget allocation and advertising reconciliation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
+
     except Exception as e:
-        print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for monthly budget allocation and advertising reconciliation for {COMPANY} company due to {e}.")
-        logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for monthly budget allocation and advertising reconciliation for {COMPANY} company due to {e}.")
+        print(f"❌ [UPDATE] Failed to update materialized reconciliation table for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
+        logging.error(f"❌ [UPDATE] Failed to update materialized reconciliation table for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
         raise
+
+    print(f"✅ [UPDATE] Successfully completed materialized reconciliation update for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account.")
+    logging.info(f"✅ [UPDATE] Successfully completed materialized reconciliation update for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account.")
