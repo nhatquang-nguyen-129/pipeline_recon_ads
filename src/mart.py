@@ -232,7 +232,7 @@ def mart_aggregate_all():
                 CASE
                     WHEN COUNTIF(LOWER(trang_thai) = 'active') > 0 THEN 'active'
                     ELSE 'inactive'
-                END AS trang_thai_chien_dich,
+                END AS trang_thai,
                 SUM(chi_tieu) AS chi_tieu
             FROM `{tbl}`
             GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su
@@ -301,11 +301,11 @@ def mart_recon_all():
     input_dataset_budget = f"{COMPANY}_dataset_budget_api_mart"
     input_table_budget_all = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_all_all_allocation_monthly"
     output_dataset_recon = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
-    output_table_recon_all = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_all_all_reconciliation_all"
+    output_table_recon_all = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_all_all_reconciliation_spend"
 
     query_recon_all = f"""
         CREATE OR REPLACE TABLE `{output_table_recon_all}`
-        CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, thang AS
+        CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
         WITH budget AS (
             SELECT * FROM `{input_table_budget_all}`
         ),
@@ -320,15 +320,25 @@ def mart_recon_all():
             COALESCE(b.nen_tang, c.nen_tang, "other") AS nen_tang,
             COALESCE(b.hinh_thuc, c.hinh_thuc, "other") AS hinh_thuc,
             COALESCE(b.thang, c.thang) AS thang,
+            COALESCE(c.nhan_su, "other") AS nhan_su,
 
             -- Budget info
+            b.ngan_sach_ban_dau,
+            b.ngan_sach_dieu_chinh,
+            b.ngan_sach_bo_sung,
             b.ngan_sach_thuc_chi,
+            b.ngan_sach_he_thong,
+            b.ngan_sach_nha_cung_cap,
+            b.ngan_sach_kinh_doanh,
+            b.ngan_sach_tien_san,
+            b.ngan_sach_tuyen_dung,
+            b.ngan_sach_khac,
             b.thoi_gian_bat_dau,
             b.thoi_gian_ket_thuc,
 
             -- Cost info
             c.chi_tieu AS so_tien_thuc_tieu,
-            c.trang_thai AS trang_thai_goc,
+            c.trang_thai AS trang_thai,
 
             -- Derived campaign status
             CASE
@@ -429,8 +439,8 @@ def mart_recon_all():
           ON b.ma_ngan_sach_cap_1 = c.ma_ngan_sach_cap_1
          AND b.chuong_trinh = c.chuong_trinh
          AND b.noi_dung = c.noi_dung
-         AND COALESCE(b.nen_tang, "other") = COALESCE(c.nen_tang, "other")
-         AND COALESCE(b.hinh_thuc, "other") = COALESCE(c.hinh_thuc, "other")
+         AND b.nen_tang = c.nen_tang
+         AND b.hinh_thuc = c.hinh_thuc
          AND b.thang = c.thang
     """
     try:
@@ -448,12 +458,12 @@ def mart_recon_all():
         output_table_spend_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_aggregation_spend"
         query_monthly_specific = f"""
             CREATE OR REPLACE TABLE `{output_table_spend_specific}`
-            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, thang AS
+            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
             SELECT * FROM `{input_table_spend_all}`
         """
         bigquery_client.query(query_monthly_specific).result()
         input_table_budget_specific = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
-        output_table_recon_specific = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_all"
+        output_table_recon_specific = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_spend"
         query_recon_specific = f"""
             CREATE OR REPLACE TABLE `{output_table_recon_specific}`
             CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, thang AS
