@@ -98,8 +98,6 @@ def update_recon_all():
         print(f"❌ [UPDATE] Failed to update materialized reconciliation table for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
         logging.error(f"❌ [UPDATE] Failed to update materialized reconciliation table for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account due to {e}.")
         raise
-
     print(f"✅ [UPDATE] Successfully completed materialized reconciliation update for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account.")
-    logging.info(f"✅ [UPDATE] Successfully completed materialized reconciliation update for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account.")
-    
+    logging.info(f"✅ [UPDATE] Successfully completed materialized reconciliation update for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account.") 
     return result
