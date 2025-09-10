@@ -117,7 +117,7 @@ def mart_budget_allocation():
         print(f"✅ [MART] Successfully created materialized table {mart_table_all} with {count_all_all} row(s) for monthly budget allocation.")
         logging.info(f"✅ [MART] Successfully created materialized table {mart_table_all} with {count_all_all} row(s) for monthly budget allocation.")
 
-    # 1.1.4. Create materialized table for supplier budget allocation
+        # 1.1.4. Create materialized table for budget allocation (all departments/accounts)
         if not (DEPARTMENT == "all" and ACCOUNT == "all"):
             mart_table_specific = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
             where_clause = ""
@@ -127,67 +127,26 @@ def mart_budget_allocation():
                 where_clause = f"WHERE department = '{DEPARTMENT}'"
             elif ACCOUNT != "all":
                 where_clause = f"WHERE account = '{ACCOUNT}'"
-            if DEPARTMENT.lower() == "marketing" and ACCOUNT.lower() == "supplier":
-                supplier_query = f"""
-                    SELECT DISTINCT supplier_name
-                    FROM `{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_raw.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_supplier_list`
-                    WHERE supplier_name IS NOT NULL
-                """
-                supplier_list = [row.supplier_name for row in bigquery_client.query(supplier_query).result()]
-                print(f"🔍 [MART] Found {len(supplier_list)} suppliers: {supplier_list}")
-
-                supplier_cols = []
-                for supplier in supplier_list:
-                    safe_supplier = supplier.lower().replace(" ", "_")
-                    supplier_cols.append(
-                        f"CASE WHEN LOWER(chuong_trinh) LIKE '%{supplier.lower()}%' "
-                        f"THEN ngan_sach_thuc_chi ELSE 0 END AS ngan_sach_{safe_supplier}"
-                    )
-                supplier_sql = ",\n                ".join(supplier_cols)
-                query_specific = f"""
-                    CREATE OR REPLACE TABLE `{mart_table_specific}` AS
-                    SELECT
-                        ma_ngan_sach_cap_1,
-                        chuong_trinh,
-                        noi_dung,
-                        nen_tang,
-                        hinh_thuc,
-                        thang,
-                        thoi_gian_bat_dau,
-                        thoi_gian_ket_thuc,
-                        tong_so_ngay_thuc_chay,
-                        tong_so_ngay_da_qua,
-                        ngan_sach_ban_dau,
-                        ngan_sach_dieu_chinh,
-                        ngan_sach_bo_sung,
-                        ngan_sach_thuc_chi,
-                        {supplier_sql}
-                    FROM `{staging_table}`
-                    {where_clause}
-                """
-
-    # 1.1.5. Create materialized table for other budget allocation
-            else:
-                query_specific = f"""
-                    CREATE OR REPLACE TABLE `{mart_table_specific}` AS
-                    SELECT
-                        ma_ngan_sach_cap_1,
-                        chuong_trinh,
-                        noi_dung,
-                        nen_tang,
-                        hinh_thuc,
-                        thang,
-                        thoi_gian_bat_dau,
-                        thoi_gian_ket_thuc,
-                        tong_so_ngay_thuc_chay,
-                        tong_so_ngay_da_qua,
-                        ngan_sach_ban_dau,
-                        ngan_sach_dieu_chinh,
-                        ngan_sach_bo_sung,
-                        ngan_sach_thuc_chi
-                    FROM `{staging_table}`
-                    {where_clause}
-                """
+            query_specific = f"""
+                CREATE OR REPLACE TABLE `{mart_table_specific}` AS
+                SELECT
+                    ma_ngan_sach_cap_1,
+                    chuong_trinh,
+                    noi_dung,
+                    nen_tang,
+                    hinh_thuc,
+                    thang,
+                    thoi_gian_bat_dau,
+                    thoi_gian_ket_thuc,
+                    tong_so_ngay_thuc_chay,
+                    tong_so_ngay_da_qua,
+                    ngan_sach_ban_dau,
+                    ngan_sach_dieu_chinh,
+                    ngan_sach_bo_sung,
+                    ngan_sach_thuc_chi
+                FROM `{staging_table}`
+                {where_clause}
+            """
             bigquery_client.query(query_specific).result()
             count_specific = list(bigquery_client.query(
                 f"SELECT COUNT(1) AS row_count FROM `{mart_table_specific}`"
