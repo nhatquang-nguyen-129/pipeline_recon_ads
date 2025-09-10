@@ -191,6 +191,7 @@ def mart_spend_all():
                     nhan_su,
                     chi_tieu
                 FROM `{tbl}`
+                WHERE chi_tieu > 0
                 """ for tbl in valid_source_tables_specific
             ])
 
@@ -512,7 +513,6 @@ def mart_recon_all():
                 b.thoi_gian_ket_thuc,
                 b.ngan_sach_thuc_chi,
                 c.chi_tieu AS so_tien_thuc_tieu,
-                c.supplier_name,                
                 CASE
                     -- Spend without Budget
                     WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
