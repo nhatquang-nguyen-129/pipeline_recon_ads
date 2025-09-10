@@ -367,93 +367,95 @@ def mart_recon_all():
             c.chi_tieu AS so_tien_thuc_tieu,
             c.trang_thai AS trang_thai,
             CASE
-            -- Spend without Budget
-            WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
-                AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
-                AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
+                -- Spend without Budget
+                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) = 0 
+                    AND COALESCE(c.chi_tieu, 0) > 0
+                    AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
                 THEN "🔴 Spend without Budget (On)"
-            WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
-                AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
-                AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
+                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) = 0 
+                    AND COALESCE(c.chi_tieu, 0) > 0
+                    AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
                 THEN "⚪ Spend without Budget (Off)"
 
-            -- No Budget
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) = 0
+                -- No Budget
+                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) = 0
                 THEN "🚫 No Budget"
 
-            -- Not Yet Started
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                AND CURRENT_DATE() < b.thoi_gian_bat_dau
+                -- Not Yet Started
+                WHEN b.ngan_sach_thuc_chi > 0
+                    AND CURRENT_DATE() < b.thoi_gian_bat_dau
                 THEN "🕓 Not Yet Started"
 
-            -- Not Set
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                AND CURRENT_DATE() >= b.thoi_gian_bat_dau
-                AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
-                AND (c.trang_thai IS NULL OR TRIM(c.trang_thai) = '')
-                AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) <= 3
+                -- Not Set (mới start, chưa spend, chưa có trạng thái)
+                WHEN b.ngan_sach_thuc_chi > 0
+                    AND CURRENT_DATE() >= b.thoi_gian_bat_dau
+                    AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
+                    AND (c.trang_thai IS NULL OR TRIM(c.trang_thai) = '')
+                    AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) <= 3
                 THEN "⚪ Not Set"
 
-            -- Delayed
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                AND CURRENT_DATE() >= b.thoi_gian_bat_dau
-                AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
-                AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
+                -- Delayed (đã start >3 ngày, chưa spend, còn trong khoảng chạy)
+                WHEN b.ngan_sach_thuc_chi > 0
+                    AND CURRENT_DATE() >= b.thoi_gian_bat_dau
+                    AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
+                    AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
+                    AND (CURRENT_DATE() <= b.thoi_gian_ket_thuc OR b.thoi_gian_ket_thuc IS NULL)
                 THEN "⚠️ Delayed"
 
-            -- Ended without Spend
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                AND CURRENT_DATE() > b.thoi_gian_ket_thuc
-                AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
+                -- Ended without Spend
+                WHEN b.ngan_sach_thuc_chi > 0
+                    AND b.thoi_gian_ket_thuc IS NOT NULL
+                    AND CURRENT_DATE() > b.thoi_gian_ket_thuc
+                    AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
                 THEN "🔒 Ended without Spend"
 
-            -- Low Spend
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
-                AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
-                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) <
-                    SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
-                                DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) - 0.3
-                THEN "📉 Low Spend"
-
-            -- High Spend
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
-                AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
-                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) >
-                    SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
-                                DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) + 0.3
-                THEN "📈 High Spend"
-
-            -- Near Completion
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) BETWEEN 0.95 AND 0.99
-                THEN "🟢 Near Completion"
-
-            -- Completed
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) > 0.99
-                AND COALESCE(c.chi_tieu, 0) < b.ngan_sach_thuc_chi * 1.01
-                THEN "🔵 Completed"
-
-            -- Over Budget
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
-                AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
+                -- Over Budget
+                WHEN b.ngan_sach_thuc_chi > 0
+                    AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
+                    AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
                 THEN "🔴 Over Budget (Still Running)"
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
-                AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
+                WHEN b.ngan_sach_thuc_chi > 0
+                    AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
+                    AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
                 THEN "⚪ Over Budget (Stopped)"
 
-            -- In Progress
-            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                AND (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
-                AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
+                -- Completed
+                WHEN b.ngan_sach_thuc_chi > 0
+                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) > 0.99
+                    AND COALESCE(c.chi_tieu, 0) < b.ngan_sach_thuc_chi * 1.01
+                THEN "🔵 Completed"
+
+                -- Near Completion
+                WHEN b.ngan_sach_thuc_chi > 0
+                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) BETWEEN 0.95 AND 0.99
+                THEN "🟢 Near Completion"
+
+                -- Low Spend
+                WHEN b.ngan_sach_thuc_chi > 0
+                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
+                    AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
+                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) <
+                        SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
+                                    DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) - 0.3
+                THEN "📉 Low Spend"
+
+                -- High Spend
+                WHEN b.ngan_sach_thuc_chi > 0
+                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
+                    AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
+                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) >
+                        SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
+                                    DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) + 0.3
+                THEN "📈 High Spend"
+
+                -- In Progress (chưa completed, chưa over budget, vẫn active)
+                WHEN b.ngan_sach_thuc_chi > 0
+                    AND COALESCE(c.chi_tieu, 0) > 0
+                    AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
                 THEN "🟢 In Progress"
 
-            -- Default
-            ELSE "❓ Not Recognized"
+                -- Default
+                ELSE "❓ Not Recognized"
             END AS trang_thai_chien_dich,
             SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), COALESCE(b.ngan_sach_thuc_chi, 0)) AS spending_ratio
         FROM budget b
@@ -500,7 +502,8 @@ def mart_recon_all():
                 b.thoi_gian_bat_dau,
                 b.thoi_gian_ket_thuc,
                 b.ngan_sach_thuc_chi,
-                c.chi_tieu AS so_tien_thuc_tieu,                
+                c.chi_tieu AS so_tien_thuc_tieu,
+                c.supplier_name,                
                 CASE
                     -- Spend without Budget
                     WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
