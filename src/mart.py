@@ -367,68 +367,93 @@ def mart_recon_all():
             c.chi_tieu AS so_tien_thuc_tieu,
             c.trang_thai AS trang_thai,
             CASE
-              WHEN COALESCE(c.chi_tieu, 0) > 0
-                   AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
-                   AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
+            -- Spend without Budget
+            WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
+                AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
+                AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
                 THEN "🔴 Spend without Budget (On)"
-              WHEN COALESCE(c.chi_tieu, 0) > 0
-                   AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
-                   AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
+            WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
+                AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
+                AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
                 THEN "⚪ Spend without Budget (Off)"
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) = 0
+
+            -- No Budget
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) = 0
                 THEN "🚫 No Budget"
-              -- Not Yet Started
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                   AND CURRENT_DATE() < b.thoi_gian_bat_dau
+
+            -- Not Yet Started
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                AND CURRENT_DATE() < b.thoi_gian_bat_dau
                 THEN "🕓 Not Yet Started"
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                   AND CURRENT_DATE() >= b.thoi_gian_bat_dau
-                   AND COALESCE(c.chi_tieu, 0) = 0
-                   AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) <= 3
+
+            -- Not Set
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                AND CURRENT_DATE() >= b.thoi_gian_bat_dau
+                AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
+                AND (c.trang_thai IS NULL OR TRIM(c.trang_thai) = '')
+                AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) <= 3
                 THEN "⚪ Not Set"
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                   AND CURRENT_DATE() >= b.thoi_gian_bat_dau
-                   AND COALESCE(c.chi_tieu, 0) = 0
-                   AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
+
+            -- Delayed
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                AND CURRENT_DATE() >= b.thoi_gian_bat_dau
+                AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
+                AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
                 THEN "⚠️ Delayed"
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                   AND CURRENT_DATE() > b.thoi_gian_ket_thuc
-                   AND COALESCE(c.chi_tieu, 0) = 0
+
+            -- Ended without Spend
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                AND CURRENT_DATE() > b.thoi_gian_ket_thuc
+                AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
                 THEN "🔒 Ended without Spend"
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                   AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
-                   AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
-                   AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) <
-                       SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
-                                   DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) - 0.3
+
+            -- Low Spend
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
+                AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
+                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) <
+                    SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
+                                DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) - 0.3
                 THEN "📉 Low Spend"
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                   AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
-                   AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
-                   AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) >
-                       SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
-                                   DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) + 0.3
+
+            -- High Spend
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
+                AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
+                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) >
+                    SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
+                                DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) + 0.3
                 THEN "📈 High Spend"
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                   AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) BETWEEN 0.95 AND 0.99
+
+            -- Near Completion
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) BETWEEN 0.95 AND 0.99
                 THEN "🟢 Near Completion"
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                   AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) > 0.99
-                   AND COALESCE(c.chi_tieu, 0) < b.ngan_sach_thuc_chi * 1.01
+
+            -- Completed
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) > 0.99
+                AND COALESCE(c.chi_tieu, 0) < b.ngan_sach_thuc_chi * 1.01
                 THEN "🔵 Completed"
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                   AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
-                   AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
+
+            -- Over Budget
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
+                AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
                 THEN "🔴 Over Budget (Still Running)"
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                   AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
-                   AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
+                AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
                 THEN "⚪ Over Budget (Stopped)"
-              WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                   AND COALESCE(c.chi_tieu, 0) > 0
-                   AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
+
+            -- In Progress
+            WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                AND (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
+                AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
                 THEN "🟢 In Progress"
-              ELSE "❓ Not Recognized"
+
+            -- Default
+            ELSE "❓ Not Recognized"
             END AS trang_thai_chien_dich,
             SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), COALESCE(b.ngan_sach_thuc_chi, 0)) AS spending_ratio
         FROM budget b
@@ -450,8 +475,143 @@ def mart_recon_all():
         logging.error(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
         print(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
 
-    # 2.1.4. If DEPARTMENT/ACCOUNT != all then build specific reconciliation tables
-    if not (DEPARTMENT == "all" and ACCOUNT == "all"):
+    # 2.1.4. Build reconciliation table for supplier/marketing
+    if DEPARTMENT == "supplier" or DEPARTMENT == "marketing":
+        input_table_spend_supplier = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_aggregation_spend"
+        input_table_budget_supplier = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
+        output_table_recon_supplier = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_spend"
+
+        query_recon_supplier = f"""
+            CREATE OR REPLACE TABLE `{output_table_recon_supplier}`
+            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, thang AS
+            WITH budget AS (
+                SELECT * FROM `{input_table_budget_supplier}`
+            ),
+            cost AS (
+                SELECT * FROM `{input_table_spend_supplier}`
+            )
+            SELECT
+                COALESCE(b.ma_ngan_sach_cap_1, c.ma_ngan_sach_cap_1) AS ma_ngan_sach_cap_1,
+                COALESCE(b.chuong_trinh, c.chuong_trinh) AS chuong_trinh,
+                COALESCE(b.noi_dung, c.noi_dung) AS noi_dung,
+                COALESCE(b.nen_tang, c.nen_tang, "other") AS nen_tang,
+                COALESCE(b.hinh_thuc, c.hinh_thuc, "other") AS hinh_thuc,
+                COALESCE(b.thang, c.thang) AS thang,
+                b.thoi_gian_bat_dau,
+                b.thoi_gian_ket_thuc,
+                b.ngan_sach_thuc_chi,
+                c.chi_tieu AS so_tien_thuc_tieu,                
+                CASE
+                    -- Spend without Budget
+                    WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
+                        AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
+                        AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
+                        THEN "🔴 Spend without Budget (On)"
+                    WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
+                        AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
+                        AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
+                        THEN "⚪ Spend without Budget (Off)"
+
+                    -- No Budget
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) = 0
+                        THEN "🚫 No Budget"
+
+                    -- Not Yet Started
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                        AND CURRENT_DATE() < b.thoi_gian_bat_dau
+                        THEN "🕓 Not Yet Started"
+
+                    -- Not Set
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                        AND CURRENT_DATE() >= b.thoi_gian_bat_dau
+                        AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
+                        AND (c.trang_thai IS NULL OR TRIM(c.trang_thai) = '')
+                        AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) <= 3
+                        THEN "⚪ Not Set"
+
+                    -- Delayed
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                        AND CURRENT_DATE() >= b.thoi_gian_bat_dau
+                        AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
+                        AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
+                        THEN "⚠️ Delayed"
+
+                    -- Ended without Spend
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                        AND CURRENT_DATE() > b.thoi_gian_ket_thuc
+                        AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
+                        THEN "🔒 Ended without Spend"
+
+                    -- Low Spend
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                        AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
+                        AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
+                        AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) <
+                            SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
+                                        DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) - 0.3
+                        THEN "📉 Low Spend"
+
+                    -- High Spend
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                        AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
+                        AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
+                        AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) >
+                            SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
+                                        DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) + 0.3
+                        THEN "📈 High Spend"
+
+                    -- Near Completion
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                        AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) BETWEEN 0.95 AND 0.99
+                        THEN "🟢 Near Completion"
+
+                    -- Completed
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                        AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) > 0.99
+                        AND COALESCE(c.chi_tieu, 0) < b.ngan_sach_thuc_chi * 1.01
+                        THEN "🔵 Completed"
+
+                    -- Over Budget
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                        AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
+                        AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
+                        THEN "🔴 Over Budget (Still Running)"
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                        AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
+                        AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
+                        THEN "⚪ Over Budget (Stopped)"
+
+                    -- In Progress
+                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
+                        AND (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
+                        AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
+                        THEN "🟢 In Progress"
+
+                    -- Default
+                    ELSE "❓ Not Recognized"
+                END AS trang_thai_chien_dich,
+                SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), COALESCE(b.ngan_sach_thuc_chi, 0)) AS spending_ratio
+            FROM budget b
+            FULL OUTER JOIN cost c
+            ON b.ma_ngan_sach_cap_1 = c.ma_ngan_sach_cap_1
+            AND b.chuong_trinh = c.chuong_trinh
+            AND b.noi_dung = c.noi_dung
+            AND b.nen_tang = c.nen_tang
+            AND b.hinh_thuc = c.hinh_thuc
+            AND b.thang = c.thang
+        """
+        try:
+            print(f"🔁 [MART] Executing supplier reconciliation query to create {output_table_recon_supplier}...")
+            logging.info(f"🔁 [MART] Executing supplier reconciliation query to create {output_table_recon_supplier}...")
+            bigquery_client.query(query_recon_supplier).result()
+            print(f"✅ [MART] Successfully created supplier reconciliation table {output_table_recon_supplier}.")
+            logging.info(f"✅ [MART] Successfully created supplier reconciliation table {output_table_recon_supplier}.")
+        except Exception as e:
+            print(f"❌ [MART] Failed to build supplier reconciliation table {output_table_recon_supplier} due to {e}.")
+            logging.error(f"❌ [MART] Failed to build supplier reconciliation table {output_table_recon_supplier} due to {e}.")
+
+    # 2.1.5. Build reconciliation table for other specific cases
+    if not (DEPARTMENT == "all" and ACCOUNT == "all") and DEPARTMENT not in ["supplier", "marketing"]:
         input_table_spend_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_aggregation_spend"
         input_table_budget_specific = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
         output_table_recon_specific = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_spend"
@@ -475,77 +635,98 @@ def mart_recon_all():
                 b.ngan_sach_dieu_chinh,
                 b.ngan_sach_bo_sung,
                 b.ngan_sach_thuc_chi,
-                b.ngan_sach_he_thong,
-                b.ngan_sach_nha_cung_cap,
-                b.ngan_sach_kinh_doanh,
-                b.ngan_sach_tien_san,
-                b.ngan_sach_tuyen_dung,
-                b.ngan_sach_khac,
                 b.thoi_gian_bat_dau,
                 b.thoi_gian_ket_thuc,
                 c.chi_tieu AS so_tien_thuc_tieu,
                 c.trang_thai AS trang_thai,
+
                 CASE
-                    WHEN COALESCE(c.chi_tieu, 0) > 0
+                    -- Spend without Budget
+                    WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
                         AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
                         AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
-                    THEN "🔴 Spend without Budget (On)"
-                    WHEN COALESCE(c.chi_tieu, 0) > 0
+                        THEN "🔴 Spend without Budget (On)"
+                    WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
                         AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
                         AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
-                    THEN "⚪ Spend without Budget (Off)"
+                        THEN "⚪ Spend without Budget (Off)"
+
+                    -- No Budget
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) = 0
-                    THEN "🚫 No Budget"
+                        THEN "🚫 No Budget"
+
+                    -- Not Yet Started
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND CURRENT_DATE() < b.thoi_gian_bat_dau
-                    THEN "🕓 Not Yet Started"
+                        THEN "🕓 Not Yet Started"
+
+                    -- Not Set
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND CURRENT_DATE() >= b.thoi_gian_bat_dau
-                        AND COALESCE(c.chi_tieu, 0) = 0
+                        AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
+                        AND (c.trang_thai IS NULL OR TRIM(c.trang_thai) = '')
                         AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) <= 3
-                    THEN "⚪ Not Set"
+                        THEN "⚪ Not Set"
+
+                    -- Delayed
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND CURRENT_DATE() >= b.thoi_gian_bat_dau
-                        AND COALESCE(c.chi_tieu, 0) = 0
+                        AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
                         AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
-                    THEN "⚠️ Delayed"
+                        THEN "⚠️ Delayed"
+
+                    -- Ended without Spend
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND CURRENT_DATE() > b.thoi_gian_ket_thuc
-                        AND COALESCE(c.chi_tieu, 0) = 0
-                    THEN "🔒 Ended without Spend"
+                        AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
+                        THEN "🔒 Ended without Spend"
+
+                    -- Low Spend
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
                         AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
                         AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) <
                             SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
                                         DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) - 0.3
-                    THEN "📉 Low Spend"
+                        THEN "📉 Low Spend"
+
+                    -- High Spend
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
                         AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
                         AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) >
                             SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
                                         DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) + 0.3
-                    THEN "📈 High Spend"
+                        THEN "📈 High Spend"
+
+                    -- Near Completion
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) BETWEEN 0.95 AND 0.99
-                    THEN "🟢 Near Completion"
+                        THEN "🟢 Near Completion"
+
+                    -- Completed
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) > 0.99
                         AND COALESCE(c.chi_tieu, 0) < b.ngan_sach_thuc_chi * 1.01
-                    THEN "🔵 Completed"
+                        THEN "🔵 Completed"
+
+                    -- Over Budget
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
                         AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
-                    THEN "🔴 Over Budget (Still Running)"
+                        THEN "🔴 Over Budget (Still Running)"
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
                         AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
-                    THEN "⚪ Over Budget (Stopped)"
+                        THEN "⚪ Over Budget (Stopped)"
+
+                    -- In Progress
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                        AND COALESCE(c.chi_tieu, 0) > 0
+                        AND (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
                         AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
-                    THEN "🟢 In Progress"
+                        THEN "🟢 In Progress"
+
+                    -- Default
                     ELSE "❓ Not Recognized"
                 END AS trang_thai_chien_dich,
                 SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), COALESCE(b.ngan_sach_thuc_chi, 0)) AS spending_ratio
@@ -558,22 +739,12 @@ def mart_recon_all():
             AND b.hinh_thuc = c.hinh_thuc
             AND b.thang = c.thang
         """
-    try:
-        print(f"🔁 [MART] Executing reconciliation query to create {output_table_recon_specific}...")
-        logging.info(f"🔁 [MART] Executing reconciliation query to create {output_table_recon_specific}...")
-        bigquery_client.query(query_recon_specific).result()
-        print(f"✅ [MART] Successfully created reconciliation table {output_table_recon_specific}.")
-        logging.info(f"✅ [MART] Successfully created reconciliation table {output_table_recon_specific}.")
-    except Exception as e:
-        print(f"❌ [MART] Failed to build reconciliation table {output_table_recon_specific} due to {e}.")
-        logging.error(f"❌ [MART] Failed to build reconciliation table {output_table_recon_specific} due to {e}.")
-
         try:
-            print(f"🔁 [MART] Executing aggregation query to create {output_table_recon_specific} reconciled advertising spend table...")
-            logging.info(f"🔁 [MART] Executing aggregation query to create {output_table_recon_specific} reconciled advertising spend table...")
+            print(f"🔁 [MART] Executing specific reconciliation query to create {output_table_recon_specific}...")
+            logging.info(f"🔁 [MART] Executing specific reconciliation query to create {output_table_recon_specific}...")
             bigquery_client.query(query_recon_specific).result()
-            logging.info(f"✅ [MART] Successfully created materialized table {output_table_recon_specific} for reconciled advertising spend.")
-            print(f"✅ [MART] Successfully created materialized table {output_table_recon_specific} for reconciled advertising spend.")
+            print(f"✅ [MART] Successfully created specific reconciliation table {output_table_recon_specific}.")
+            logging.info(f"✅ [MART] Successfully created specific reconciliation table {output_table_recon_specific}.")
         except Exception as e:
-            logging.error(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
-            print(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
+            print(f"❌ [MART] Failed to build specific reconciliation table {output_table_recon_specific} due to {e}.")
+            logging.error(f"❌ [MART] Failed to build specific reconciliation table {output_table_recon_specific} due to {e}.")
