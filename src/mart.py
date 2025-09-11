@@ -63,8 +63,8 @@ MODE = os.getenv("MODE")
 
 # 1.1. Build unified daily cost table from multiple advertising platforms
 def mart_spend_all():
-    print(f"🚀 [MART] Starting unified daily advertising spend aggregation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account...")
-    logging.info(f"🚀 [MART] Starting unified daily advertising spend aggregation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account...")
+    print(f"🚀 [MART] Starting unified daily advertising performance aggregation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account...")
+    logging.info(f"🚀 [MART] Starting unified daily advertising performance aggregation for {COMPANY} company with {DEPARTMENT} department and {ACCOUNT} account...")
 
     # 1.1.1. Initialize BigQuery client
     try:
@@ -73,11 +73,7 @@ def mart_spend_all():
         raise RuntimeError("❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
 
     # 1.1.2. Define advertising networks
-    networks = ["facebook", 
-                "tiktok", 
-                "google", 
-                "shopee", 
-                "zalo"]
+    networks = ["facebook", "tiktok", "google", "shopee", "zalo"]
 
     # 1.1.3. Prepare valid source tables lists
     valid_source_tables_all = []
@@ -86,41 +82,45 @@ def mart_spend_all():
     # 1.1.4. Scan source tables for each network
     for network in networks:
         try:
-            print(f"🔍 [MART] Scanning for {network} materialized dataset for advertising spend unification...")
-            logging.info(f"🔍 [MART] Scanning for {network} materialized dataset for advertising spend unification...")
+            print(f"🔍 [MART] Scanning for {network} materialized dataset for advertising performance unification...")
+            logging.info(f"🔍 [MART] Scanning for {network} materialized dataset for advertising performance unification...")
             mart_dataset = f"{COMPANY}_dataset_{network}_api_mart"
-            print(f"✅ [MART] Successfully retrieved {network} materialized dataset for advertising spend unification.")
-            logging.info(f"✅ [MART] Successfully retrieved {network} materialized dataset for advertising spend unification.")
+            print(f"✅ [MART] Successfully retrieved {network} materialized dataset for advertising performance unification.")
+            logging.info(f"✅ [MART] Successfully retrieved {network} materialized dataset for advertising performance unification.")
         except KeyError:
             print(f"⚠️ [MART] Materialized dataset for {network} not found then unification is skipped.")
             logging.warning(f"⚠️ [MART] Materialized dataset for {network} not found then unification is skipped.")
             continue
-        source_table_all = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{network}_all_all_campaign_spend"
+
+        # all_all source
+        source_table_all = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{network}_all_all_campaign_performance"
         try:
             bigquery_client.get_table(source_table_all)
             valid_source_tables_all.append(source_table_all)
-            print(f"✅ [MART] Successfully retrieved {source_table_all} materialized table for all_all spend unification.")
-            logging.info(f"✅ [MART] Successfully retrieved {source_table_all} materialized table for all_all spend unification.")
+            print(f"✅ [MART] Successfully retrieved {source_table_all} materialized table for all_all performance unification.")
+            logging.info(f"✅ [MART] Successfully retrieved {source_table_all} materialized table for all_all performance unification.")
         except NotFound:
             print(f"⚠️ [MART] Source table {source_table_all} not found then all_all unification is skipped.")
             logging.warning(f"⚠️ [MART] Source table {source_table_all} not found then all_all unification is skipped.")
-        source_table_specific = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{network}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
+
+        # department/account source
+        source_table_specific = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{network}_{DEPARTMENT}_{ACCOUNT}_campaign_performance"
         try:
             bigquery_client.get_table(source_table_specific)
             valid_source_tables_specific.append(source_table_specific)
-            print(f"✅ [MART] Successfully retrieved {source_table_specific} materialized table for pair-key spend unification.")
-            logging.info(f"✅ [MART] Successfully retrieved {source_table_specific} materialized table for pair-key spend unification.")
+            print(f"✅ [MART] Successfully retrieved {source_table_specific} materialized table for pair-key performance unification.")
+            logging.info(f"✅ [MART] Successfully retrieved {source_table_specific} materialized table for pair-key performance unification.")
         except NotFound:
             print(f"⚠️ [MART] Source table {source_table_specific} not found then pair-key unification is skipped.")
             logging.warning(f"⚠️ [MART] Source table {source_table_specific} not found then pair-key unification is skipped.")
 
     # 1.1.5. Validate at least some sources exist
     if not valid_source_tables_all and not valid_source_tables_specific:
-        print("❌ [MART] Failed to unify advertising spend due to no valid source tables found.")
-        logging.error("❌ [MART] Failed to unify advertising spend due to no valid source tables found.")
+        print("❌ [MART] Failed to unify advertising performance due to no valid source tables found.")
+        logging.error("❌ [MART] Failed to unify advertising performance due to no valid source tables found.")
         return
 
-    # 1.1.4. Always build all_all unified advertising spend table
+    # 1.1.6. Always build all_all unified advertising performance table
     if valid_source_tables_all:
         output_table_all = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_all_all_campaign_spend"
         union_sql_all = "\nUNION ALL\n".join([
@@ -131,13 +131,14 @@ def mart_spend_all():
                 chuong_trinh,
                 noi_dung,
                 hinh_thuc,
-                thang,
+                campaign_name,
+                FORMAT_DATE('%Y-%m', ngay) AS thang,
                 trang_thai,
                 ngay,
                 nhan_su,
-                chi_tieu
+                spend AS chi_tieu
             FROM `{tbl}`
-            WHERE chi_tieu > 0
+            WHERE spend > 0
             """ for tbl in valid_source_tables_all
         ])
         query_all = f"""
@@ -147,13 +148,13 @@ def mart_spend_all():
             AS
             {union_sql_all}
         """
-        print(f"🔄 [MART] Querying all campaign spend table(s) to build materialized table {output_table_all}...")
-        logging.info(f"🔄 [MART] Querying all campaign spend table(s) to build materialized table {output_table_all}...")
+        print(f"🔄 [MART] Querying all campaign performance table(s) to build materialized table {output_table_all}...")
+        logging.info(f"🔄 [MART] Querying all campaign performance table(s) to build materialized table {output_table_all}...")
         bigquery_client.query(query_all).result()
         print(f"✅ [MART] Successfully created materialized table {output_table_all}.")
         logging.info(f"✅ [MART] Successfully created materialized table {output_table_all}.")
 
-    # 1.1.6. If DEPARTMENT/ACCOUNT != all then build specific table
+    # 1.1.7. If DEPARTMENT/ACCOUNT != all then build specific table
     if not (DEPARTMENT == "all" and ACCOUNT == "all") and valid_source_tables_specific:
         output_table_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
 
@@ -167,11 +168,12 @@ def mart_spend_all():
                     chuong_trinh,
                     noi_dung,
                     hinh_thuc,
-                    thang,
+                    campaign_name,
+                    FORMAT_DATE('%Y-%m', ngay) AS thang,
                     trang_thai,
                     ngay,
                     nhan_su,
-                    chi_tieu,
+                    spend AS chi_tieu,
                     supplier_name
                 FROM `{tbl}`
                 """ for tbl in valid_source_tables_specific
@@ -185,11 +187,12 @@ def mart_spend_all():
                     chuong_trinh,
                     noi_dung,
                     hinh_thuc,
-                    thang,
+                    campaign_name,
+                    FORMAT_DATE('%Y-%m', ngay) AS thang,
                     trang_thai,
                     ngay,
                     nhan_su,
-                    chi_tieu
+                    spend AS chi_tieu
                 FROM `{tbl}`
                 WHERE chi_tieu > 0
                 """ for tbl in valid_source_tables_specific
@@ -202,9 +205,8 @@ def mart_spend_all():
             AS
             {union_sql_specific}
         """
-
-        print(f"🔄 [MART] Querying all campaign spend table(s) to build materialized table {output_table_specific}...")
-        logging.info(f"🔄 [MART] Querying all campaign spend table(s) to build materialized table {output_table_specific}...")
+        print(f"🔄 [MART] Querying all campaign performance table(s) to build materialized table {output_table_specific}...")
+        logging.info(f"🔄 [MART] Querying all campaign performance table(s) to build materialized table {output_table_specific}...")
         bigquery_client.query(query_specific).result()
         print(f"✅ [MART] Successfully created materialized table {output_table_specific}.")
         logging.info(f"✅ [MART] Successfully created materialized table {output_table_specific}.")
@@ -240,7 +242,7 @@ def mart_aggregate_all():
                 thang,
                 nhan_su,
                 CASE
-                    WHEN COUNTIF(LOWER(trang_thai) = 'active') > 0 THEN 'active'
+                    WHEN COUNTIF(LOWER(trang_thai) = '🟢') > 0 THEN 'active'
                     ELSE 'inactive'
                 END AS trang_thai,
                 SUM(chi_tieu) AS chi_tieu
@@ -277,7 +279,7 @@ def mart_aggregate_all():
                         nhan_su,
                         supplier_name,
                         CASE
-                            WHEN COUNTIF(LOWER(trang_thai) = 'active') > 0 THEN 'active'
+                            WHEN COUNTIF(LOWER(trang_thai) = '🟢') > 0 THEN 'active'
                             ELSE 'inactive'
                         END AS trang_thai,
                         SUM(chi_tieu) AS chi_tieu
