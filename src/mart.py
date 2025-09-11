@@ -398,19 +398,6 @@ def mart_recon_all():
                         AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) <= 3
                         THEN "⚪ Not Set"
 
-                    -- Delayed
-                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                        AND CURRENT_DATE() >= b.thoi_gian_bat_dau
-                        AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
-                        AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
-                        THEN "⚠️ Delayed"
-
-                    -- Ended without Spend
-                    WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                        AND CURRENT_DATE() > b.thoi_gian_ket_thuc
-                        AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
-                        THEN "🔒 Ended without Spend"
-
                     -- Low Spend (active only)
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
