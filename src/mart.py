@@ -399,9 +399,10 @@ def mart_recon_all():
                     AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) <= 3
                     THEN "⚪ Not Set"
 
-                -- Delayed (quá 3 ngày mà vẫn chưa có chi tiêu/trạng thái)
+                -- Delayed (quá 3 ngày mà vẫn chưa có chi tiêu/trạng thái, và chưa kết thúc)
                 WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                     AND CURRENT_DATE() >= b.thoi_gian_bat_dau
+                    AND CURRENT_DATE() <= b.thoi_gian_ket_thuc
                     AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
                     AND (c.trang_thai IS NULL OR TRIM(c.trang_thai) = '')
                     AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
@@ -546,13 +547,14 @@ def mart_recon_all():
                         AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) <= 3
                         THEN "⚪ Not Set"
 
-                    -- Delayed (quá 3 ngày mà vẫn chưa có chi tiêu/trạng thái)
+                    -- Delayed (quá 3 ngày mà vẫn chưa có chi tiêu/trạng thái, và chưa kết thúc)
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND CURRENT_DATE() >= b.thoi_gian_bat_dau
+                        AND CURRENT_DATE() <= b.thoi_gian_ket_thuc
                         AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
                         AND (c.trang_thai IS NULL OR TRIM(c.trang_thai) = '')
                         AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
-                        THEN "⚠️ Delayed"                    
+                        THEN "⚠️ Delayed"                 
 
                     -- Ended without Spend
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
@@ -696,13 +698,14 @@ def mart_recon_all():
                         AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) <= 3
                         THEN "⚪ Not Set"
 
-                    -- Delayed (quá 3 ngày mà vẫn chưa có chi tiêu/trạng thái)
+                    -- Delayed (quá 3 ngày mà vẫn chưa có chi tiêu/trạng thái, và chưa kết thúc)
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                         AND CURRENT_DATE() >= b.thoi_gian_bat_dau
+                        AND CURRENT_DATE() <= b.thoi_gian_ket_thuc
                         AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
                         AND (c.trang_thai IS NULL OR TRIM(c.trang_thai) = '')
                         AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
-                        THEN "⚠️ Delayed"                       
+                        THEN "⚠️ Delayed"                     
 
                     -- Ended without Spend
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
