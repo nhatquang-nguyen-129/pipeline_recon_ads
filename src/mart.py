@@ -117,8 +117,47 @@ def mart_budget_allocation():
         print(f"✅ [MART] Successfully created materialized table {mart_table_all} with {count_all_all} row(s) for monthly budget allocation.")
         logging.info(f"✅ [MART] Successfully created materialized table {mart_table_all} with {count_all_all} row(s) for monthly budget allocation.")
 
-        # 1.1.4. Create materialized table for budget allocation (all departments/accounts)
-        if not (DEPARTMENT == "all" and ACCOUNT == "all"):
+    # 1.1.4. Special case: department = marketing, account = supplier
+        if DEPARTMENT == "marketing" and ACCOUNT == "supplier":
+            raw_supplier_table = f"{PROJECT}.{COMPANY}_dataset_budget_api_raw.{COMPANY}_table_budget_marketing_supplier_supplier_metadata"
+            mart_table_supplier = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_marketing_supplier_allocation_monthly"
+
+            print(f"🔍 [MART] Building supplier-specific table {mart_table_supplier} using {raw_supplier_table}...")
+            logging.info(f"🔍 [MART] Building supplier-specific table {mart_table_supplier} using {raw_supplier_table}...")
+
+            query_supplier = f"""
+                CREATE OR REPLACE TABLE `{mart_table_supplier}` AS
+                SELECT
+                    a.ma_ngan_sach_cap_1,
+                    a.chuong_trinh,
+                    a.noi_dung,
+                    a.nen_tang,
+                    a.hinh_thuc,
+                    a.thang,
+                    a.thoi_gian_bat_dau,
+                    a.thoi_gian_ket_thuc,
+                    a.tong_so_ngay_thuc_chay,
+                    a.tong_so_ngay_da_qua,
+                    a.ngan_sach_ban_dau,
+                    a.ngan_sach_dieu_chinh,
+                    a.ngan_sach_bo_sung,
+                    a.ngan_sach_thuc_chi,
+                    s.supplier_name
+                FROM `{staging_table}` a
+                LEFT JOIN `{raw_supplier_table}` s
+                ON REGEXP_CONTAINS(a.chuong_trinh, s.supplier_name)
+                WHERE a.department = 'marketing'
+                AND a.account = 'supplier'
+            """
+            bigquery_client.query(query_supplier).result()
+            count_supplier = list(bigquery_client.query(
+                f"SELECT COUNT(1) AS row_count FROM `{mart_table_supplier}`"
+            ).result())[0]["row_count"]
+            print(f"✅ [MART] Successfully created {mart_table_supplier} with {count_supplier} row(s).")
+            logging.info(f"✅ [MART] Successfully created {mart_table_supplier} with {count_supplier} row(s).")
+
+    # 1.1.5. Create materialized table for other departments/accounts
+        elif not (DEPARTMENT == "all" and ACCOUNT == "all"):
             mart_table_specific = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
             where_clause = ""
             if DEPARTMENT != "all" and ACCOUNT != "all":
@@ -127,6 +166,7 @@ def mart_budget_allocation():
                 where_clause = f"WHERE department = '{DEPARTMENT}'"
             elif ACCOUNT != "all":
                 where_clause = f"WHERE account = '{ACCOUNT}'"
+
             query_specific = f"""
                 CREATE OR REPLACE TABLE `{mart_table_specific}` AS
                 SELECT
