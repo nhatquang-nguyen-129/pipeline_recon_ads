@@ -79,11 +79,10 @@ def main():
             raise ImportError(
                 f"❌ [MAIN] Ads update module must define 'update_recon_all'."
             )
-        layers = [layer.strip() for layer in LAYER.split(",") if layer.strip()]
-        if len(layers) != 1 or layers[0] != "recon":
-            raise ValueError("⚠️ [MAIN] Ads only supports one LAYER=recon per execution.")
+        if LAYER != "all":
+            raise ValueError("⚠️ [MAIN] Reconcilication only supports one layer 'all' per execution.")
         if MODE != "all":
-            raise ValueError("⚠️ [MAIN] Ads only supports MODE=all.")
+            raise ValueError("⚠️ [MAIN] Reconciliation only support one mode 'all' per execution.")
 
         print(f"🚀 [MAIN] Starting to build unified ads spend reconciliation table for {COMPANY} with {DEPARTMENT} and {ACCOUNT}...")
         logging.info(f"🚀 [MAIN] Starting to build unified ads spend reconciliation table for {COMPANY} with {DEPARTMENT} and {ACCOUNT}...")
