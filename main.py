@@ -72,7 +72,7 @@ def main():
     today = datetime.today()
 
     # 1.2.3. PLATFORM = recon
-    if PLATFORM == "all":
+    if PLATFORM == "recon":
         try:
             update_recon = update_module.update_recon_all
         except AttributeError:
