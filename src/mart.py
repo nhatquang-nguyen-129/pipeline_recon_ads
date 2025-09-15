@@ -28,11 +28,25 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.
 # Add logging ultilies for integration
 import logging
 
+# Add Python Pandas library for data processing
+import pandas as pd
+
 # Add Google Authentication libraries for integration
+from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
+from google.auth.transport.requests import AuthorizedSession
+
+# Add Google Spreadsheets API libraries for integration
+import gspread
 
 # Add Google CLoud libraries for integration
 from google.cloud import bigquery
+
+# Add Google Secret Manager for integration
+from google.cloud import secretmanager
+
+# Add UUID libraries for integration
+import uuid
 
 # Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
@@ -119,42 +133,68 @@ def mart_budget_allocation():
 
     # 1.1.4. Special case: department = marketing, account = supplier
         if DEPARTMENT == "marketing" and ACCOUNT == "supplier":
-            raw_supplier_table = f"{PROJECT}.{COMPANY}_dataset_budget_api_raw.{COMPANY}_table_budget_marketing_supplier_supplier_metadata"
             mart_table_supplier = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_marketing_supplier_allocation_monthly"
 
-            print(f"🔍 [MART] Building supplier-specific table {mart_table_supplier} using {raw_supplier_table}...")
-            logging.info(f"🔍 [MART] Building supplier-specific table {mart_table_supplier} using {raw_supplier_table}...")
+            print(f"🔍 [MART] Building supplier-specific table {mart_table_supplier} using Google Sheets (supplier metadata)...")
+            logging.info(f"🔍 [MART] Building supplier-specific table {mart_table_supplier} using Google Sheets (supplier metadata)...")
 
-            query_supplier = f"""
-                CREATE OR REPLACE TABLE `{mart_table_supplier}` AS
-                SELECT
-                    a.ma_ngan_sach_cap_1,
-                    a.chuong_trinh,
-                    a.noi_dung,
-                    a.nen_tang,
-                    a.hinh_thuc,
-                    a.thang,
-                    a.thoi_gian_bat_dau,
-                    a.thoi_gian_ket_thuc,
-                    a.tong_so_ngay_thuc_chay,
-                    a.tong_so_ngay_da_qua,
-                    a.ngan_sach_ban_dau,
-                    a.ngan_sach_dieu_chinh,
-                    a.ngan_sach_bo_sung,
-                    a.ngan_sach_thuc_chi,
-                    s.supplier_name
-                FROM `{staging_table}` a
-                LEFT JOIN `{raw_supplier_table}` s
-                ON REGEXP_CONTAINS(a.chuong_trinh, s.supplier_name)
-                WHERE a.department = 'marketing'
-                AND a.account = 'supplier'
-            """
-            bigquery_client.query(query_supplier).result()
-            count_supplier = list(bigquery_client.query(
-                f"SELECT COUNT(1) AS row_count FROM `{mart_table_supplier}`"
-            ).result())[0]["row_count"]
-            print(f"✅ [MART] Successfully created {mart_table_supplier} with {count_supplier} row(s).")
-            logging.info(f"✅ [MART] Successfully created {mart_table_supplier} with {count_supplier} row(s).")
+            secret_client = secretmanager.SecretManagerServiceClient()
+            secret_id = f"{COMPANY}_secret_{DEPARTMENT}_{PLATFORM}_sheet_id_{ACCOUNT}"
+            secret_name = f"projects/{PROJECT}/secrets/{secret_id}/versions/latest"
+            response = secret_client.access_secret_version(name=secret_name)
+            sheet_id_supplier = response.payload.data.decode("UTF-8")
+
+            scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+            creds, _ = default(scopes=scopes)
+            gc = gspread.Client(auth=creds)
+            gc.session = AuthorizedSession(creds)
+
+            worksheet = gc.open_by_key(sheet_id_supplier).worksheet("supplier")
+            records = worksheet.get_all_records()
+            df_supplier = pd.DataFrame(records)
+
+            if "supplier_name" not in df_supplier.columns:
+                raise RuntimeError("❌ [MART] Missing 'supplier_name' column in supplier sheet.")
+
+            temp_table_id = f"{PROJECT}.{mart_dataset}.temp_supplier_{uuid.uuid4().hex[:8]}"
+            job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
+            bigquery_client.load_table_from_dataframe(df_supplier[["supplier_name"]], temp_table_id, job_config=job_config).result()
+            print(f"✅ [MART] Temp supplier table {temp_table_id} created with {len(df_supplier)} row(s).")
+
+            try:
+                query_supplier = f"""
+                    CREATE OR REPLACE TABLE `{mart_table_supplier}` AS
+                    SELECT
+                        a.ma_ngan_sach_cap_1,
+                        a.chuong_trinh,
+                        a.noi_dung,
+                        a.nen_tang,
+                        a.hinh_thuc,
+                        a.thang,
+                        a.thoi_gian_bat_dau,
+                        a.thoi_gian_ket_thuc,
+                        a.tong_so_ngay_thuc_chay,
+                        a.tong_so_ngay_da_qua,
+                        a.ngan_sach_ban_dau,
+                        a.ngan_sach_dieu_chinh,
+                        a.ngan_sach_bo_sung,
+                        a.ngan_sach_thuc_chi,
+                        s.supplier_name
+                    FROM `{staging_table}` a
+                    LEFT JOIN `{temp_table_id}` s
+                    ON REGEXP_CONTAINS(a.chuong_trinh, s.supplier_name)
+                    WHERE a.department = 'marketing'
+                    AND a.account = 'supplier'
+                """
+                bigquery_client.query(query_supplier).result()
+                count_supplier = list(bigquery_client.query(
+                    f"SELECT COUNT(1) AS row_count FROM `{mart_table_supplier}`"
+                ).result())[0]["row_count"]
+                print(f"✅ [MART] Successfully created {mart_table_supplier} with {count_supplier} row(s).")
+                logging.info(f"✅ [MART] Successfully created {mart_table_supplier} with {count_supplier} row(s).")
+            finally:
+                bigquery_client.delete_table(temp_table_id, not_found_ok=True)
+                print(f"🧹 [MART] Temp supplier table {temp_table_id} deleted.")
 
     # 1.1.5. Create materialized table for other departments/accounts
         elif not (DEPARTMENT == "all" and ACCOUNT == "all"):
