@@ -195,7 +195,7 @@ def mart_spend_all():
                     nhan_su,
                     spend AS chi_tieu
                 FROM `{tbl}`
-                WHERE chi_tieu > 0
+                WHERE spend > 0
                 """ for tbl in valid_source_tables_specific
             ])
 
@@ -493,7 +493,7 @@ def mart_recon_all():
         print(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
 
     # 2.1.4. Build reconciliation table for supplier/marketing
-    if DEPARTMENT == "supplier" or DEPARTMENT == "marketing":
+    if DEPARTMENT == "marketing" and ACCOUNT == "supplier":
         input_table_spend_supplier = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_aggregation_spend"
         input_table_budget_supplier = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
         output_table_recon_supplier = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_spend"
@@ -642,7 +642,7 @@ def mart_recon_all():
             logging.error(f"❌ [MART] Failed to build supplier reconciliation table {output_table_recon_supplier} due to {e}.")
 
     # 2.1.5. Build reconciliation table for other specific cases
-    if not (DEPARTMENT == "all" and ACCOUNT == "all") and DEPARTMENT not in ["supplier", "marketing"]:
+    elif not (DEPARTMENT == "all" and ACCOUNT == "all"):
         input_table_spend_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_aggregation_spend"
         input_table_budget_specific = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
         output_table_recon_specific = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_spend"
