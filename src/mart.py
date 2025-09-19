@@ -76,13 +76,13 @@ def mart_budget_allocation():
     print("🚀 [MART] Starting to build materialized table(s) for monthly budget allocation...")
     logging.info("🚀 [MART] Starting to build materialized table(s) for monthly budget allocation...")
 
-    # 1.1.1. Prepare table_id
     try:
+        # 1.1.1. Prepare table_id
         staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_staging"
         staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
         mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
-   
-    # 1.1.2. Initialize Google BigQuery client
+
+        # 1.1.2. Initialize Google BigQuery client
         try:
             print(f"🔍 [MART] Initializing Google BigQuery client for project {PROJECT}...")
             logging.info(f"🔍 [MART] Initializing Google BigQuery client for project {PROJECT}...")
@@ -95,43 +95,7 @@ def mart_budget_allocation():
             print(f"❌ [MART] Failed to initialize Google BigQuery client due to {str(e)}.")
             logging.error(f"❌ [MART] Failed to initialize Google BigQuery client due to {str(e)}.")
 
-    # 1.1.3. Create materialized table for montly budget allocation
-        print(f"🔄 [MART] Querying staging budget allocation {staging_table} table for monthly budget allocation creation...")
-        logging.info(f"🔄 [MART] Querying staging budget allocation {staging_table} table for monthly budget allocation creation...")
-        mart_table_all = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
-        query_all = f"""
-            CREATE OR REPLACE TABLE `{mart_table_all}` AS
-            SELECT
-                ma_ngan_sach_cap_1,
-                chuong_trinh,
-                noi_dung,
-                nen_tang,
-                hinh_thuc,
-                thang,
-                thoi_gian_bat_dau,
-                thoi_gian_ket_thuc,
-                tong_so_ngay_thuc_chay,
-                tong_so_ngay_da_qua,
-                ngan_sach_ban_dau,
-                ngan_sach_dieu_chinh,
-                ngan_sach_bo_sung,
-                ngan_sach_thuc_chi,
-                ngan_sach_he_thong,
-                ngan_sach_nha_cung_cap,
-                ngan_sach_kinh_doanh,
-                ngan_sach_tien_san,
-                ngan_sach_tuyen_dung,
-                ngan_sach_khac
-            FROM `{staging_table}`
-        """
-        bigquery_client.query(query_all).result()
-        count_all_all = list(bigquery_client.query(
-            f"SELECT COUNT(1) AS row_count FROM `{mart_table_all}`"
-        ).result())[0]["row_count"]
-        print(f"✅ [MART] Successfully created materialized table {mart_table_all} with {count_all_all} row(s) for monthly budget allocation.")
-        logging.info(f"✅ [MART] Successfully created materialized table {mart_table_all} with {count_all_all} row(s) for monthly budget allocation.")
-
-    # 1.1.4. Special case: department = marketing, account = supplier
+        # 1.1.3. Case đặc biệt: department = marketing, account = supplier
         if DEPARTMENT == "marketing" and ACCOUNT == "supplier":
             mart_table_supplier = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_marketing_supplier_allocation_monthly"
 
@@ -196,17 +160,10 @@ def mart_budget_allocation():
                 bigquery_client.delete_table(temp_table_id, not_found_ok=True)
                 print(f"🧹 [MART] Temp supplier table {temp_table_id} deleted.")
 
-    # 1.1.5. Create materialized table for other departments/accounts
-        elif not (DEPARTMENT == "all" and ACCOUNT == "all"):
+        # 1.1.4. Tất cả các trường hợp khác → query specific
+        else:
             mart_table_specific = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
-            where_clause = ""
-            if DEPARTMENT != "all" and ACCOUNT != "all":
-                where_clause = f"WHERE department = '{DEPARTMENT}' AND account = '{ACCOUNT}'"
-            elif DEPARTMENT != "all":
-                where_clause = f"WHERE department = '{DEPARTMENT}'"
-            elif ACCOUNT != "all":
-                where_clause = f"WHERE account = '{ACCOUNT}'"
-
+            where_clause = f"WHERE account = '{ACCOUNT}'"
             query_specific = f"""
                 CREATE OR REPLACE TABLE `{mart_table_specific}` AS
                 SELECT
@@ -223,7 +180,13 @@ def mart_budget_allocation():
                     ngan_sach_ban_dau,
                     ngan_sach_dieu_chinh,
                     ngan_sach_bo_sung,
-                    ngan_sach_thuc_chi
+                    ngan_sach_thuc_chi,
+                    ngan_sach_he_thong,
+                    ngan_sach_nha_cung_cap,
+                    ngan_sach_kinh_doanh,
+                    ngan_sach_tien_san,
+                    ngan_sach_tuyen_dung,
+                    ngan_sach_khac
                 FROM `{staging_table}`
                 {where_clause}
             """
@@ -233,6 +196,7 @@ def mart_budget_allocation():
             ).result())[0]["row_count"]
             print(f"✅ [MART] Successfully created {mart_table_specific} with {count_specific} row(s).")
             logging.info(f"✅ [MART] Successfully created {mart_table_specific} with {count_specific} row(s).")
+
     except Exception as e:
         print(f"❌ [MART] Failed to build materialized table(s) due to {e}.")
         logging.error(f"❌ [MART] Failed to build materialized table(s) due to {e}.")
