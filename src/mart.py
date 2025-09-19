@@ -120,47 +120,12 @@ def mart_spend_all():
         logging.error("❌ [MART] Failed to unify advertising performance due to no valid source tables found.")
         return
 
-    # 1.1.6. Always build all_all unified advertising performance table
-    if valid_source_tables_all:
-        output_table_all = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_all_all_campaign_spend"
-        union_sql_all = "\nUNION ALL\n".join([
-            f"""
-            SELECT
-                nen_tang,
-                ma_ngan_sach_cap_1,
-                chuong_trinh,
-                noi_dung,
-                hinh_thuc,
-                campaign_name,
-                FORMAT_DATE('%Y-%m', ngay) AS thang,
-                trang_thai,
-                ngay,
-                nhan_su,
-                spend AS chi_tieu
-            FROM `{tbl}`
-            WHERE spend > 0
-            """ for tbl in valid_source_tables_all
-        ])
-        query_all = f"""
-            CREATE OR REPLACE TABLE `{output_table_all}`
-            PARTITION BY ngay
-            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang
-            AS
-            {union_sql_all}
-        """
-        print(f"🔄 [MART] Querying all campaign performance table(s) to build materialized table {output_table_all}...")
-        logging.info(f"🔄 [MART] Querying all campaign performance table(s) to build materialized table {output_table_all}...")
-        bigquery_client.query(query_all).result()
-        print(f"✅ [MART] Successfully created materialized table {output_table_all}.")
-        logging.info(f"✅ [MART] Successfully created materialized table {output_table_all}.")
+    # 1.1.6. Build unified advertising performance table
+    if valid_source_tables_specific:
+        output_table = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
 
-    # 1.1.7. If DEPARTMENT/ACCOUNT != all then build specific table
-    if not (DEPARTMENT == "all" and ACCOUNT == "all") and valid_source_tables_specific:
-        output_table_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
-
-        # Nếu là marketing + supplier thì build thêm supplier_name
-        if DEPARTMENT == "marketing" and ACCOUNT == "supplier":
-            union_sql_specific = "\nUNION ALL\n".join([
+        if DEPARTMENT == "marketing" and ACCOUNT == "supplier":         
+            union_sql = "\nUNION ALL\n".join([
                 f"""
                 SELECT
                     nen_tang,
@@ -180,7 +145,7 @@ def mart_spend_all():
                 """ for tbl in valid_source_tables_specific
             ])
         else:
-            union_sql_specific = "\nUNION ALL\n".join([
+            union_sql = "\nUNION ALL\n".join([
                 f"""
                 SELECT
                     nen_tang,
@@ -199,18 +164,18 @@ def mart_spend_all():
                 """ for tbl in valid_source_tables_specific
             ])
 
-        query_specific = f"""
-            CREATE OR REPLACE TABLE `{output_table_specific}`
+        query = f"""
+            CREATE OR REPLACE TABLE `{output_table}`
             PARTITION BY ngay
             CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang
             AS
-            {union_sql_specific}
+            {union_sql}
         """
-        print(f"🔄 [MART] Querying all campaign performance table(s) to build materialized table {output_table_specific}...")
-        logging.info(f"🔄 [MART] Querying all campaign performance table(s) to build materialized table {output_table_specific}...")
-        bigquery_client.query(query_specific).result()
-        print(f"✅ [MART] Successfully created materialized table {output_table_specific}.")
-        logging.info(f"✅ [MART] Successfully created materialized table {output_table_specific}.")
+        print(f"🔄 [MART] Querying all campaign performance table(s) to build materialized table {output_table}...")
+        logging.info(f"🔄 [MART] Querying all campaign performance table(s) to build materialized table {output_table}...")
+        bigquery_client.query(query).result()
+        print(f"✅ [MART] Successfully created materialized table {output_table}.")
+        logging.info(f"✅ [MART] Successfully created materialized table {output_table}.")
 
 # 1.2. Build unified monthly aggregate cost table from multiple advertising platforms
 def mart_aggregate_all():
@@ -223,16 +188,35 @@ def mart_aggregate_all():
     except DefaultCredentialsError as e:
         raise RuntimeError("❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
 
-    # 1.2.2. Define source tables (daily spend unified)
-    source_table_all = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_all_all_campaign_spend"
-    source_table_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
+    # 1.2.2. Define source & output tables
+    source_table = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_campaign_spend"
+    output_table = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_aggregation_spend"
 
-    # 1.2.3. Build monthly all_all aggregation
-    try:
-        bigquery_client.get_table(source_table_all)
-        output_table_all = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_all_all_aggregation_spend"
-        query_all = f"""
-            CREATE OR REPLACE TABLE `{output_table_all}`
+    # 1.2.3. Build query (supplier có thêm supplier_name)
+    if DEPARTMENT == "marketing" and ACCOUNT == "supplier":
+        query = f"""
+            CREATE OR REPLACE TABLE `{output_table}`
+            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
+            SELECT
+                nen_tang,
+                ma_ngan_sach_cap_1,
+                chuong_trinh,
+                noi_dung,
+                hinh_thuc,
+                thang,
+                nhan_su,
+                supplier_name,
+                CASE
+                    WHEN COUNTIF(LOWER(trang_thai) = '🟢') > 0 THEN 'active'
+                    ELSE 'inactive'
+                END AS trang_thai,
+                SUM(chi_tieu) AS chi_tieu
+            FROM `{source_table}`
+            GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su, supplier_name
+        """
+    else:
+        query = f"""
+            CREATE OR REPLACE TABLE `{output_table}`
             CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
             SELECT
                 nen_tang,
@@ -247,75 +231,21 @@ def mart_aggregate_all():
                     ELSE 'inactive'
                 END AS trang_thai,
                 SUM(chi_tieu) AS chi_tieu
-            FROM `{source_table_all}`
+            FROM `{source_table}`
             GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su
         """
-        print(f"🔄 [MART] Aggregating daily spend into monthly table {output_table_all}...")
-        logging.info(f"🔄 [MART] Aggregating daily spend into monthly table {output_table_all}...")
-        bigquery_client.query(query_all).result()
-        print(f"✅ [MART] Successfully created monthly aggregation table {output_table_all}.")
-        logging.info(f"✅ [MART] Successfully created monthly aggregation table {output_table_all}.")
+
+    # 1.2.4. Execute query
+    try:
+        bigquery_client.get_table(source_table)  # check source tồn tại
+        print(f"🔄 [MART] Aggregating daily spend into monthly table {output_table}...")
+        logging.info(f"🔄 [MART] Aggregating daily spend into monthly table {output_table}...")
+        bigquery_client.query(query).result()
+        print(f"✅ [MART] Successfully created monthly aggregation table {output_table}.")
+        logging.info(f"✅ [MART] Successfully created monthly aggregation table {output_table}.")
     except NotFound:
-        print(f"⚠️ [MART] Daily spend table {source_table_all} not found, skipping all_all aggregation.")
-        logging.warning(f"⚠️ [MART] Daily spend table {source_table_all} not found, skipping all_all aggregation.")
-
-    # 1.2.4. Build monthly specific aggregation (if not all/all)
-    if not (DEPARTMENT == "all" and ACCOUNT == "all"):
-        try:
-            bigquery_client.get_table(source_table_specific)
-            output_table_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_aggregation_spend"
-
-            # Nếu là marketing + supplier thì build thêm supplier_name
-            if DEPARTMENT == "marketing" and ACCOUNT == "supplier":
-                query_specific = f"""
-                    CREATE OR REPLACE TABLE `{output_table_specific}`
-                    CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
-                    SELECT
-                        nen_tang,
-                        ma_ngan_sach_cap_1,
-                        chuong_trinh,
-                        noi_dung,
-                        hinh_thuc,
-                        thang,
-                        nhan_su,
-                        supplier_name,
-                        CASE
-                            WHEN COUNTIF(LOWER(trang_thai) = '🟢') > 0 THEN 'active'
-                            ELSE 'inactive'
-                        END AS trang_thai,
-                        SUM(chi_tieu) AS chi_tieu
-                    FROM `{source_table_specific}`
-                    GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su, supplier_name
-                """
-            else:
-                query_specific = f"""
-                    CREATE OR REPLACE TABLE `{output_table_specific}`
-                    CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
-                    SELECT
-                        nen_tang,
-                        ma_ngan_sach_cap_1,
-                        chuong_trinh,
-                        noi_dung,
-                        hinh_thuc,
-                        thang,
-                        nhan_su,
-                        CASE
-                            WHEN COUNTIF(LOWER(trang_thai) = 'active') > 0 THEN 'active'
-                            ELSE 'inactive'
-                        END AS trang_thai,
-                        SUM(chi_tieu) AS chi_tieu
-                    FROM `{source_table_specific}`
-                    GROUP BY nen_tang, ma_ngan_sach_cap_1, chuong_trinh, noi_dung, hinh_thuc, thang, nhan_su
-                """
-
-            print(f"🔄 [MART] Aggregating daily spend into monthly table {output_table_specific}...")
-            logging.info(f"🔄 [MART] Aggregating daily spend into monthly table {output_table_specific}...")
-            bigquery_client.query(query_specific).result()
-            print(f"✅ [MART] Successfully created monthly aggregation table {output_table_specific}.")
-            logging.info(f"✅ [MART] Successfully created monthly aggregation table {output_table_specific}.")
-        except NotFound:
-            print(f"⚠️ [MART] Daily spend table {source_table_specific} not found, skipping specific aggregation.")
-            logging.warning(f"⚠️ [MART] Daily spend table {source_table_specific} not found, skipping specific aggregation.")
+        print(f"⚠️ [MART] Daily spend table {source_table} not found, skipping aggregation.")
+        logging.warning(f"⚠️ [MART] Daily spend table {source_table} not found, skipping aggregation.")
 
 # 2. BUILD MATERIALIZED TABLE FOR BUDGET ALLOCATION AND ADVERTISING SPEND RECONCILIATION
 
@@ -330,182 +260,23 @@ def mart_recon_all():
     except DefaultCredentialsError as e:
         raise RuntimeError(" ❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
 
-    # 2.1.2. Define source aggregation spend table
-    input_table_spend_all = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_all_all_aggregation_spend"
-    print(f"🔍 [MART] Using aggregated spend table {input_table_spend_all} for advertising reconciliation...")
-    logging.info(f"🔍 [MART] Using aggregated spend table {input_table_spend_all} for advertising reconciliation...")
-
-    # 2.1.3. Define budget and recon output tables
+    # 2.1.2. Define source tables
     input_dataset_budget = f"{COMPANY}_dataset_budget_api_mart"
-    input_table_budget_all = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_all_all_allocation_monthly"
+    input_table_spend = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_aggregation_spend"
+    input_table_budget = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
     output_dataset_recon = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
-    output_table_recon_all = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_all_all_reconciliation_spend"
-    query_recon_all = f"""
-        CREATE OR REPLACE TABLE `{output_table_recon_all}`
-        CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
-        WITH budget AS (
-            SELECT * FROM `{input_table_budget_all}`
-        ),
-        cost AS (
-            SELECT * FROM `{input_table_spend_all}`
-        )
-        SELECT
-            COALESCE(b.ma_ngan_sach_cap_1, c.ma_ngan_sach_cap_1) AS ma_ngan_sach_cap_1,
-            COALESCE(b.chuong_trinh, c.chuong_trinh) AS chuong_trinh,
-            COALESCE(b.noi_dung, c.noi_dung) AS noi_dung,
-            COALESCE(b.nen_tang, c.nen_tang, "other") AS nen_tang,
-            COALESCE(b.hinh_thuc, c.hinh_thuc, "other") AS hinh_thuc,
-            COALESCE(b.thang, c.thang) AS thang,
-            COALESCE(c.nhan_su, "other") AS nhan_su,
-            b.ngan_sach_ban_dau,
-            b.ngan_sach_dieu_chinh,
-            b.ngan_sach_bo_sung,
-            b.ngan_sach_thuc_chi,
-            b.ngan_sach_he_thong,
-            b.ngan_sach_nha_cung_cap,
-            b.ngan_sach_kinh_doanh,
-            b.ngan_sach_tien_san,
-            b.ngan_sach_tuyen_dung,
-            b.ngan_sach_khac,
-            b.thoi_gian_bat_dau,
-            b.thoi_gian_ket_thuc,
-            c.chi_tieu AS so_tien_thuc_tieu,
-            c.trang_thai AS trang_thai,
-            CASE
-                -- Spend without Budget
-                WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
-                    AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
-                    AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
-                    THEN "🔴 Spend without Budget (On)"
-                WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
-                    AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
-                    AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
-                    THEN "⚪ Spend without Budget (Off)"
+    output_table_recon = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_spend"
 
-                -- No Budget
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) = 0
-                    THEN "🚫 No Budget"
-
-                -- Not Yet Started
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND CURRENT_DATE() < b.thoi_gian_bat_dau
-                    THEN "🕓 Not Yet Started"
-
-                -- Not Set
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND CURRENT_DATE() >= b.thoi_gian_bat_dau
-                    AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
-                    AND (c.trang_thai IS NULL OR TRIM(c.trang_thai) = '')
-                    AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) <= 3
-                    THEN "⚪ Not Set"
-
-                -- Delayed (quá 3 ngày mà vẫn chưa có chi tiêu/trạng thái, và chưa kết thúc)
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND CURRENT_DATE() >= b.thoi_gian_bat_dau
-                    AND CURRENT_DATE() <= b.thoi_gian_ket_thuc
-                    AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
-                    AND (c.trang_thai IS NULL OR TRIM(c.trang_thai) = '')
-                    AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
-                    THEN "⚠️ Delayed"
-
-                -- Ended without Spend
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND CURRENT_DATE() > b.thoi_gian_ket_thuc
-                    AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
-                    THEN "🔒 Ended without Spend"
-
-                -- Low Spend (active only)
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
-                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
-                    AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
-                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) <
-                        SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
-                                    DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) - 0.3
-                    THEN "📉 Low Spend"
-
-                -- High Spend (active only)
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
-                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
-                    AND DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY) > 0
-                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) >
-                        SAFE_DIVIDE(DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY),
-                                    DATE_DIFF(b.thoi_gian_ket_thuc, b.thoi_gian_bat_dau, DAY)) + 0.3
-                    THEN "📈 High Spend"
-
-                -- Near Completion (active only)
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
-                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) BETWEEN 0.95 AND 0.99
-                    THEN "🟢 Near Completion"
-
-                -- Off (Paused/Stopped, not ended, not over budget)
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
-                    AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
-                    AND COALESCE(c.chi_tieu, 0) < b.ngan_sach_thuc_chi * 0.99
-                    THEN "⚪ Off (Early Stopped)"
-
-                -- Completed
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) > 0.99
-                    AND COALESCE(c.chi_tieu, 0) < b.ngan_sach_thuc_chi * 1.01
-                    THEN "🔵 Completed"
-
-                -- Over Budget
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
-                    AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
-                    THEN "🔴 Over Budget (Still Running)"
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
-                    AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
-                    THEN "⚪ Over Budget (Stopped)"
-
-                -- In Progress (active only)
-                WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
-                    AND (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
-                    AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
-                    THEN "🟢 In Progress"
-
-                -- Default
-                ELSE "❓ Not Recognized"
-            END AS trang_thai_chien_dich,
-            SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), COALESCE(b.ngan_sach_thuc_chi, 0)) AS spending_ratio
-        FROM budget b
-        FULL OUTER JOIN cost c
-          ON b.ma_ngan_sach_cap_1 = c.ma_ngan_sach_cap_1
-         AND b.chuong_trinh = c.chuong_trinh
-         AND b.noi_dung = c.noi_dung
-         AND b.nen_tang = c.nen_tang
-         AND b.hinh_thuc = c.hinh_thuc
-         AND b.thang = c.thang
-    """
-    try:
-        print(f"🔁 [MART] Executing aggregation query to create {output_table_recon_all} reconciled advertising spend table...")
-        logging.info(f"🔁 [MART] Executing aggregation query to create {output_table_recon_all} reconciled advertising spend table...")
-        bigquery_client.query(query_recon_all).result()
-        logging.info(f"✅ [MART] Successfully created materialized table {output_table_recon_all} for reconciled advertising spend.")
-        print(f"✅ [MART] Successfully created materialized table {output_table_recon_all} for reconciled advertising spend.")
-    except Exception as e:
-        logging.error(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
-        print(f"❌ [MART] Failed to excute aggregation query to build reconciled advertising spend table due to {e}.")
-
-    # 2.1.4. Build reconciliation table for supplier/marketing
+    # 2.1.3. Build query (check supplier trước)
     if DEPARTMENT == "marketing" and ACCOUNT == "supplier":
-        input_table_spend_supplier = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_aggregation_spend"
-        input_table_budget_supplier = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
-        output_table_recon_supplier = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_spend"
-
-        query_recon_supplier = f"""
-            CREATE OR REPLACE TABLE `{output_table_recon_supplier}`
+        query_recon = f"""
+            CREATE OR REPLACE TABLE `{output_table_recon}`
             CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, supplier_name, thang AS
             WITH budget AS (
-                SELECT * FROM `{input_table_budget_supplier}`
+                SELECT * FROM `{input_table_budget}`
             ),
             cost AS (
-                SELECT * FROM `{input_table_spend_supplier}`
+                SELECT * FROM `{input_table_spend}`
             )
             SELECT
                 COALESCE(b.ma_ngan_sach_cap_1, c.ma_ngan_sach_cap_1) AS ma_ngan_sach_cap_1,
@@ -623,37 +394,23 @@ def mart_recon_all():
                 SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), COALESCE(b.ngan_sach_thuc_chi, 0)) AS spending_ratio
             FROM budget b
             FULL OUTER JOIN cost c
-            ON b.ma_ngan_sach_cap_1 = c.ma_ngan_sach_cap_1
-            AND b.chuong_trinh = c.chuong_trinh
-            AND b.noi_dung = c.noi_dung
-            AND b.nen_tang = c.nen_tang
-            AND b.hinh_thuc = c.hinh_thuc
-            AND b.thang = c.thang
-            AND b.supplier_name = c.supplier_name
+              ON b.ma_ngan_sach_cap_1 = c.ma_ngan_sach_cap_1
+             AND b.chuong_trinh = c.chuong_trinh
+             AND b.noi_dung = c.noi_dung
+             AND b.nen_tang = c.nen_tang
+             AND b.hinh_thuc = c.hinh_thuc
+             AND b.thang = c.thang
+             AND b.supplier_name = c.supplier_name
         """
-        try:
-            print(f"🔁 [MART] Executing supplier reconciliation query to create {output_table_recon_supplier}...")
-            logging.info(f"🔁 [MART] Executing supplier reconciliation query to create {output_table_recon_supplier}...")
-            bigquery_client.query(query_recon_supplier).result()
-            print(f"✅ [MART] Successfully created supplier reconciliation table {output_table_recon_supplier}.")
-            logging.info(f"✅ [MART] Successfully created supplier reconciliation table {output_table_recon_supplier}.")
-        except Exception as e:
-            print(f"❌ [MART] Failed to build supplier reconciliation table {output_table_recon_supplier} due to {e}.")
-            logging.error(f"❌ [MART] Failed to build supplier reconciliation table {output_table_recon_supplier} due to {e}.")
-
-    # 2.1.5. Build reconciliation table for other specific cases
-    elif not (DEPARTMENT == "all" and ACCOUNT == "all"):
-        input_table_spend_specific = f"{PROJECT}.{COMPANY}_dataset_{PLATFORM}_api_mart.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_aggregation_spend"
-        input_table_budget_specific = f"{PROJECT}.{input_dataset_budget}.{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
-        output_table_recon_specific = f"{PROJECT}.{output_dataset_recon}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_reconciliation_spend"
-        query_recon_specific = f"""
-            CREATE OR REPLACE TABLE `{output_table_recon_specific}`
-            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, thang AS
+    else:
+        query_recon = f"""
+            CREATE OR REPLACE TABLE `{output_table_recon}`
+            CLUSTER BY ma_ngan_sach_cap_1, chuong_trinh, nhan_su, thang AS
             WITH budget AS (
-                SELECT * FROM `{input_table_budget_specific}`
+                SELECT * FROM `{input_table_budget}`
             ),
             cost AS (
-                SELECT * FROM `{input_table_spend_specific}`
+                SELECT * FROM `{input_table_spend}`
             )
             SELECT
                 COALESCE(b.ma_ngan_sach_cap_1, c.ma_ngan_sach_cap_1) AS ma_ngan_sach_cap_1,
@@ -662,16 +419,23 @@ def mart_recon_all():
                 COALESCE(b.nen_tang, c.nen_tang, "other") AS nen_tang,
                 COALESCE(b.hinh_thuc, c.hinh_thuc, "other") AS hinh_thuc,
                 COALESCE(b.thang, c.thang) AS thang,
+                COALESCE(c.nhan_su, "other") AS nhan_su,
                 b.ngan_sach_ban_dau,
                 b.ngan_sach_dieu_chinh,
                 b.ngan_sach_bo_sung,
                 b.ngan_sach_thuc_chi,
+                b.ngan_sach_he_thong,
+                b.ngan_sach_nha_cung_cap,
+                b.ngan_sach_kinh_doanh,
+                b.ngan_sach_tien_san,
+                b.ngan_sach_tuyen_dung,
+                b.ngan_sach_khac,
                 b.thoi_gian_bat_dau,
                 b.thoi_gian_ket_thuc,
                 c.chi_tieu AS so_tien_thuc_tieu,
                 c.trang_thai AS trang_thai,
                 CASE
-                    -- Spend without Budget
+                        -- Spend without Budget
                     WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
                         AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
                         AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
@@ -705,7 +469,7 @@ def mart_recon_all():
                         AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
                         AND (c.trang_thai IS NULL OR TRIM(c.trang_thai) = '')
                         AND DATE_DIFF(CURRENT_DATE(), b.thoi_gian_bat_dau, DAY) > 3
-                        THEN "⚠️ Delayed"                     
+                        THEN "⚠️ Delayed"                 
 
                     -- Ended without Spend
                     WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
@@ -774,19 +538,21 @@ def mart_recon_all():
                 SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), COALESCE(b.ngan_sach_thuc_chi, 0)) AS spending_ratio
             FROM budget b
             FULL OUTER JOIN cost c
-            ON b.ma_ngan_sach_cap_1 = c.ma_ngan_sach_cap_1
-            AND b.chuong_trinh = c.chuong_trinh
-            AND b.noi_dung = c.noi_dung
-            AND b.nen_tang = c.nen_tang
-            AND b.hinh_thuc = c.hinh_thuc
-            AND b.thang = c.thang
+              ON b.ma_ngan_sach_cap_1 = c.ma_ngan_sach_cap_1
+             AND b.chuong_trinh = c.chuong_trinh
+             AND b.noi_dung = c.noi_dung
+             AND b.nen_tang = c.nen_tang
+             AND b.hinh_thuc = c.hinh_thuc
+             AND b.thang = c.thang
         """
-        try:
-            print(f"🔁 [MART] Executing specific reconciliation query to create {output_table_recon_specific}...")
-            logging.info(f"🔁 [MART] Executing specific reconciliation query to create {output_table_recon_specific}...")
-            bigquery_client.query(query_recon_specific).result()
-            print(f"✅ [MART] Successfully created specific reconciliation table {output_table_recon_specific}.")
-            logging.info(f"✅ [MART] Successfully created specific reconciliation table {output_table_recon_specific}.")
-        except Exception as e:
-            print(f"❌ [MART] Failed to build specific reconciliation table {output_table_recon_specific} due to {e}.")
-            logging.error(f"❌ [MART] Failed to build specific reconciliation table {output_table_recon_specific} due to {e}.")
+
+    # 2.1.4. Execute query
+    try:
+        print(f"🔁 [MART] Executing reconciliation query to create {output_table_recon}...")
+        logging.info(f"🔁 [MART] Executing reconciliation query to create {output_table_recon}...")
+        bigquery_client.query(query_recon).result()
+        print(f"✅ [MART] Successfully created reconciliation table {output_table_recon}.")
+        logging.info(f"✅ [MART] Successfully created reconciliation table {output_table_recon}.")
+    except Exception as e:
+        print(f"❌ [MART] Failed to build reconciliation table {output_table_recon} due to {e}.")
+        logging.error(f"❌ [MART] Failed to build reconciliation table {output_table_recon} due to {e}.")
