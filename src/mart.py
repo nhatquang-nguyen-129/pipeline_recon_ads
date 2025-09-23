@@ -32,12 +32,19 @@ import logging
 import pandas as pd
 
 # Add Google Authentication libraries for integration
+from google.api_core.exceptions import (
+    GoogleAPICallError,
+    Forbidden,
+    NotFound,
+    PermissionDenied, 
+)
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
 from google.auth.transport.requests import AuthorizedSession
 
 # Add Google Spreadsheets API libraries for integration
 import gspread
+from gspread.exceptions import SpreadsheetNotFound, WorksheetNotFound, APIError, GSpreadException
 
 # Add Google CLoud libraries for integration
 from google.cloud import bigquery
@@ -77,54 +84,104 @@ def mart_budget_allocation():
     logging.info("🚀 [MART] Starting to build materialized table(s) for monthly budget allocation...")
 
     try:
-        # 1.1.1. Prepare table_id
+    
+    # 1.1.1. Prepare id
         staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_staging"
         staging_table = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
         mart_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_mart"
 
-        # 1.1.2. Initialize Google BigQuery client
+    # 1.1.2. Initialize Google BigQuery client
         try:
-            print(f"🔍 [MART] Initializing Google BigQuery client for project {PROJECT}...")
-            logging.info(f"🔍 [MART] Initializing Google BigQuery client for project {PROJECT}...")
-            bigquery_client = bigquery.Client(project=PROJECT)
-            print(f"✅ [MART] Successfully initialized Google BigQuery client for {PROJECT}.")
-            logging.info(f"✅ [MART] Successfully initialized Google BigQuery client for {PROJECT}.")
+            print(f"🔍 [MART] Initializing Google BigQuery client for Google Cloud Platform project {PROJECT}...")
+            logging.info(f"🔍 [MART] Initializing Google BigQuery client for Google Cloud Platform project {PROJECT}...")
+            google_bigquery_client = bigquery.Client(project=PROJECT)
+            print(f"✅ [MART] Successfully initialized Google BigQuery client for Google Cloud Platform project {PROJECT}.")
+            logging.info(f"✅ [MART] Successfully initialized Google BigQuery client for Google Cloud Platform project {PROJECT}.")
         except DefaultCredentialsError as e:
-            raise RuntimeError(f"❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
+            raise RuntimeError("❌ [MART] Failed to initialize Google BigQuery client due to credentials error.") from e
+        except Forbidden as e:
+            raise RuntimeError("❌ [MART] Failed to initialize Google BigQuery client due to permission denial.") from e
+        except GoogleAPICallError as e:
+            raise RuntimeError("❌ [MART] Failed to initialize Google BigQuery client due to API call error.") from e
         except Exception as e:
-            print(f"❌ [MART] Failed to initialize Google BigQuery client due to {str(e)}.")
-            logging.error(f"❌ [MART] Failed to initialize Google BigQuery client due to {str(e)}.")
+            raise RuntimeError(f"❌ [MARTT] Failed to initialize Google BigQuery client due to {e}.") from e
 
-        # 1.1.3. Case đặc biệt: department = marketing, account = supplier
+    # 1.1.3. Query staging table to build materialized table for supplier
         if DEPARTMENT == "marketing" and ACCOUNT == "supplier":
             mart_table_supplier = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_marketing_supplier_allocation_monthly"
 
-            print(f"🔍 [MART] Building supplier-specific table {mart_table_supplier} using Google Sheets (supplier metadata)...")
-            logging.info(f"🔍 [MART] Building supplier-specific table {mart_table_supplier} using Google Sheets (supplier metadata)...")
+            print(f"🔍 [MART] Building materialized table {mart_table_supplier} for supplier using supplier metadata from Google Sheets...")
+            logging.info(f"🔍 [MART] Building materialized table {mart_table_supplier} for supplier using supplier metadata from Google Sheets...")
 
-            secret_client = secretmanager.SecretManagerServiceClient()
-            secret_id = f"{COMPANY}_secret_{DEPARTMENT}_{PLATFORM}_sheet_id_{ACCOUNT}"
-            secret_name = f"projects/{PROJECT}/secrets/{secret_id}/versions/latest"
-            response = secret_client.access_secret_version(name=secret_name)
+            try:
+                print(f"🔍 [MART] Initializing Google Secret Manager client for Google Cloud Platform project {PROJECT}...")
+                logging.info(f"🔍 [MART] Initializing Google Secret Manager client for Google Cloud Platform project {PROJECT}...")
+                google_secret_client = secretmanager.SecretManagerServiceClient()
+                print(f"✅ [MART] Successfully initialized Google Secret Manager client for Google Cloud project {PROJECT}.")
+                logging.info(f"✅ [MART] Successfully initialized Google Secret Manager client for Google Cloud project {PROJECT}.")
+            except DefaultCredentialsError as e:
+                raise RuntimeError("❌ [MART] Failed to initialize Google Secret Manager client due to credentials error.") from e
+            except PermissionDenied as e:
+                raise RuntimeError("❌ [MART] Failed to initialize Google Secret Manager client due to permission denial.") from e
+            except NotFound as e:
+                raise RuntimeError("❌ [MART] Failed to initialize Google Secret Manager client because secret not found.") from e
+            except GoogleAPICallError as e:
+                raise RuntimeError("❌ [MART] Failed to initialize Google Secret Manager client due to API call error.") from e
+            except Exception as e:
+                raise RuntimeError(f"❌ [MART] Failed to initialize Google Secret Manager client due to unexpected error {e}.") from e
+            
+            print(f"🔍 [MART] Retrieving supplier budget information for {ACCOUNT} from Google Secret Manager...")
+            logging.info(f"🔍 [MART] Retrieving supplier budget information for {ACCOUNT} from Google Secret Manager...") 
+            budget_secret_id = f"{COMPANY}_secret_{DEPARTMENT}_{PLATFORM}_sheet_id_{ACCOUNT}"
+            budget_secret_name = f"projects/{PROJECT}/secrets/{budget_secret_id}/versions/latest"
+            response = google_secret_client.access_secret_version(name=budget_secret_name)
             sheet_id_supplier = response.payload.data.decode("UTF-8")
+            print(f"✅ [MART] Successfully retrieved supplier budget allocation sheet_id {sheet_id_supplier} for environment variable {ACCOUNT} from Google Secret Manager.")
+            logging.info(f"✅ [MART] Successfully retrieved supplier budget allocation sheet_id {sheet_id_supplier} for environment variable {ACCOUNT} from Google Secret Manager.")   
 
-            scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-            creds, _ = default(scopes=scopes)
-            gc = gspread.Client(auth=creds)
-            gc.session = AuthorizedSession(creds)
+            try:
+                print(f"🔍 [MART] Initializing Google Sheets client for sheet_id {sheet_id_supplier}...")
+                logging.info(f"🔍 [MART] Initializing Google Sheets client for sheet_id {sheet_id_supplier}...")                
+                scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+                creds, _ = default(scopes=scopes)
+                google_gspread_client = gspread.Client(auth=creds)
+                google_gspread_client.session = AuthorizedSession(creds)
+                print(f"✅ [MART] Successfully initialized Google Sheets client for sheet_id {sheet_id_supplier} with scopes {scopes}.")
+                logging.info(f"✅ [MART] Successfully initialized Google Sheets client for sheet_id {sheet_id_supplier} with scopes {scopes}.")
+            except DefaultCredentialsError as e:
+                raise RuntimeError("❌ [MART] Failed to initialize Google Sheets client due to credentials error.") from e
+            except SpreadsheetNotFound as e:
+                raise RuntimeError(f"❌ [MART] Failed to initialize Google Sheets client because spreadsheet {sheet_id_supplier} not found.") from e
+            except WorksheetNotFound as e:
+                raise RuntimeError(f"❌ [MART] Failed to initialize Google Sheets client because worksheet not found in spreadsheet {sheet_id_supplier}.") from e
+            except APIError as e:
+                raise RuntimeError("❌ [MART] Failed to initialize Google Sheets client due to API error.") from e
+            except GSpreadException as e:
+                raise RuntimeError("❌ [MART] Failed to initialize Google Sheets client due to Gspread client error.") from e
+            except Exception as e:
+                raise RuntimeError(f"❌ [MART] Failed to initialize Google Sheets client due to {e}.") from e         
 
-            worksheet = gc.open_by_key(sheet_id_supplier).worksheet("supplier")
-            records = worksheet.get_all_records()
-            df_supplier = pd.DataFrame(records)
-
+            try:
+                print(f"🔍 [MART] Retrieving budget allocation data in Google Sheets file {sheet_id_supplier} from Google Sheets API...")
+                logging.info(f"🔍 [MART] Retrieving budget allocation data in Google Sheets file {sheet_id_supplier} from Google Sheets API...")
+                worksheet = google_gspread_client.open_by_key(sheet_id_supplier).worksheet("supplier")
+                records = worksheet.get_all_records()
+                df_supplier = pd.DataFrame(records)
+                print(f"✅ [MART] Retrieved {len(records)} row(s) of supplier metadata from {worksheet} in Google Sheets file {sheet_id_supplier}.")
+                logging.info(f"✅ [MART] Retrieved {len(records)} row(s) of supplier metadata from {worksheet} in Google Sheets file {sheet_id_supplier}.")
+            except Exception as e:
+                print(f"❌ [MART] Failed to fetch supplier metadata from {worksheet} worksheet in {sheet_id_supplier} Google Sheets file due to {e}.")
+                logging.error(f"❌ [MART] Failed to fetch supplier metadata from {worksheet} worksheet in {sheet_id_supplier} Google Sheets file due to {e}.")
             if "supplier_name" not in df_supplier.columns:
-                raise RuntimeError("❌ [MART] Missing 'supplier_name' column in supplier sheet.")
+                raise RuntimeError(f"❌ [MART] Missing 'supplier_name' column in supplier sheet {sheet_id_supplier}.")
 
+            print(f"🔍 [MART] Creating supplier metadata temporary from Google Sheets file {sheet_id_supplier} to build materialized table for supplier budget allocation...")
+            logging.info(f"🔍 [MART] Creating supplier metadata temporary from Google Sheets file {sheet_id_supplier} to build materialized table for supplier budget allocation...")            
             temp_table_id = f"{PROJECT}.{mart_dataset}.temp_supplier_{uuid.uuid4().hex[:8]}"
             job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
-            bigquery_client.load_table_from_dataframe(df_supplier[["supplier_name"]], temp_table_id, job_config=job_config).result()
-            print(f"✅ [MART] Temp supplier table {temp_table_id} created with {len(df_supplier)} row(s).")
-
+            google_bigquery_client.load_table_from_dataframe(df_supplier[["supplier_name"]], temp_table_id, job_config=job_config).result()
+            print(f"✅ [MART] Successfully created supplier metadata temporary table {temp_table_id} with {len(df_supplier)} row(s).")
+            logging.info(f"✅ [MART] Successfully created supplier metadata temporary table {temp_table_id} with {len(df_supplier)} row(s).")            
             try:
                 query_supplier = f"""
                     CREATE OR REPLACE TABLE `{mart_table_supplier}` AS
@@ -150,17 +207,22 @@ def mart_budget_allocation():
                     WHERE a.department = 'marketing'
                     AND a.account = 'supplier'
                 """
-                bigquery_client.query(query_supplier).result()
-                count_supplier = list(bigquery_client.query(
+                print(f"🔄 [MART] Querying staging budget allocation table {staging_table} to build materialized table {mart_table_supplier} for supplier...")
+                logging.info(f"🔄 [MART] Querying staging budget allocation table {staging_table} to build materialized table {mart_table_supplier} for supplier...")
+                google_bigquery_client.query(query_supplier).result()
+                count_supplier = list(google_bigquery_client.query(
                     f"SELECT COUNT(1) AS row_count FROM `{mart_table_supplier}`"
                 ).result())[0]["row_count"]
-                print(f"✅ [MART] Successfully created {mart_table_supplier} with {count_supplier} row(s).")
-                logging.info(f"✅ [MART] Successfully created {mart_table_supplier} with {count_supplier} row(s).")
+                print(f"✅ [MART] Successfully (re)built materialized table {mart_table_supplier} for supplier with {count_supplier} row(s).")
+                logging.info(f"✅ [MART] Successfully (re)built materialized table {mart_table_supplier} for supplier with {count_supplier} row(s).")
             finally:
-                bigquery_client.delete_table(temp_table_id, not_found_ok=True)
-                print(f"🧹 [MART] Temp supplier table {temp_table_id} deleted.")
-
-        # 1.1.4. Tất cả các trường hợp khác → query specific
+                print(f"🔄 [MART] The materialized table rebuild process is finished then supplier metadata temporary table {temp_table_id} deletion will be proceeding...")
+                logging.info(f"🔄 [MART] The materialized table rebuild process is finished then supplier metadata temporary table {temp_table_id} deletion will be proceeding...")
+                google_bigquery_client.delete_table(temp_table_id, not_found_ok=True)
+                print(f"✅ [MART] Successfully deleted supplier metadata temporary {temp_table_id} in Google BigQuery.")
+                logging.info(f"✅ [MART] Successfully deleted supplier metadata temporary {temp_table_id} in Google BigQuery.")
+        
+        # 1.1.4. Query staging table to build materialized table for specific case(s)
         else:
             mart_table_specific = f"{PROJECT}.{mart_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_monthly"
             where_clause = f"WHERE account = '{ACCOUNT}'"
@@ -190,13 +252,14 @@ def mart_budget_allocation():
                 FROM `{staging_table}`
                 {where_clause}
             """
-            bigquery_client.query(query_specific).result()
-            count_specific = list(bigquery_client.query(
+            print(f"🔄 [MART] Querying staging budget allocation table {staging_table} to build materialized table {mart_table_specific} for specific case(s)...")
+            logging.info(f"🔄 [MART] Querying staging budget allocation table {staging_table} to build materialized table {mart_table_specific} for specific case(s)...")
+            google_bigquery_client.query(query_specific).result()
+            count_specific = list(google_bigquery_client.query(
                 f"SELECT COUNT(1) AS row_count FROM `{mart_table_specific}`"
             ).result())[0]["row_count"]
-            print(f"✅ [MART] Successfully created {mart_table_specific} with {count_specific} row(s).")
-            logging.info(f"✅ [MART] Successfully created {mart_table_specific} with {count_specific} row(s).")
-
+            print(f"✅ [MART] Successfully (re)built materialized table {mart_table_specific} with {count_specific} row(s).")
+            logging.info(f"✅ [MART] Successfully (re)built materialized table {mart_table_specific} with {count_specific} row(s).")
     except Exception as e:
         print(f"❌ [MART] Failed to build materialized table(s) due to {e}.")
         logging.error(f"❌ [MART] Failed to build materialized table(s) due to {e}.")

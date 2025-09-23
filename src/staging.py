@@ -33,6 +33,7 @@ import re
 
 # Add Google Authentication libraries for integration
 from google.auth.exceptions import DefaultCredentialsError
+from google.api_core.exceptions import Forbidden, GoogleAPICallError
 
 # Add Google BigQuery library for integration
 from google.cloud import bigquery
@@ -69,12 +70,25 @@ def staging_budget_allocation():
     print("🚀 [STAGING] Starting unified staging process for all budget raw tables...")
     logging.info("🚀 [STAGING] Starting unified staging process for all budget raw tables...")
 
-    # 1.1.1. Prepare id for raw layer in Google BigQuery
     try:
+    
+    # 1.1.1. Initialize Google BigQuery client
         try:
-            client = bigquery.Client(project=PROJECT)
+            print(f"🔍 [STAGING] Initializing Google BigQuery client for Google Cloud Platform project {PROJECT}...")
+            logging.info(f"🔍 [STAGING] Initializing Google BigQuery client for Google Cloud Platform project {PROJECT}...")
+            google_bigquery_client = bigquery.Client(project=PROJECT)
+            print(f"✅ [STAGING] Successfully initialized Google BigQuery client for Google Cloud Platform project {PROJECT}.")
+            logging.info(f"✅ [STAGING] Successfully initialized Google BigQuery client for Google Cloud Platform project {PROJECT}.")
         except DefaultCredentialsError as e:
-            raise RuntimeError(" ❌ [INGEST] Failed to initialize Google BigQuery client due to credentials error.") from e
+            raise RuntimeError("❌ [STAGING] Failed to initialize Google BigQuery client due to credentials error.") from e
+        except Forbidden as e:
+            raise RuntimeError("❌ [STAGING] Failed to initialize Google BigQuery client due to permission denial.") from e
+        except GoogleAPICallError as e:
+            raise RuntimeError("❌ [STAGING] Failed to initialize Google BigQuery client due to API call error.") from e
+        except Exception as e:
+            raise RuntimeError(f"❌ [STAGING] Failed to initialize Google BigQuery client due to {e}.") from e
+
+    # 1.1.2. Prepare id        
         raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"
         print(f"🔍 [STAGING] Using raw dataset {raw_dataset} to build staging table for budget allocation...")
         logging.info(f"🔍 [STAGING] Using raw dataset {raw_dataset} to build staging table for budget allocation...")
@@ -83,10 +97,10 @@ def staging_budget_allocation():
         print(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for budget allocation...")
         logging.info(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for budget allocation...")
 
-        # 1.1.2. Scan all raw budget allocation table(s)
+    # 1.1.3. Scan all raw budget allocation table(s)
         print("🔍 [STAGING] Scanning all raw budget allocation table(s)...")
         logging.info("🔍 [STAGING] Scanning all raw budget allocation table(s)...")
-        tables = client.list_tables(f"{PROJECT}.{raw_dataset}")
+        tables = google_bigquery_client.list_tables(f"{PROJECT}.{raw_dataset}")
         raw_tables = [
             table.table_id for table in tables 
             if re.match(r"^.*_allocation_[a-zA-Z0-9_]+$", table.table_id)
@@ -98,15 +112,14 @@ def staging_budget_allocation():
         print(f"✅ [STAGING] Successfully found {len(raw_tables)} raw budget table(s) for {COMPANY} company: {raw_tables}")
         logging.info(f"✅ [STAGING] Successfully found {len(raw_tables)} raw budget table(s) for {COMPANY} company: {raw_tables}")
 
-
-    # 1.1.3. Query raw budget table(s)
+    # 1.1.4. Query raw budget table(s)
         all_dfs = []
         for table in raw_tables:
             raw_table = f"{PROJECT}.{raw_dataset}.{table}"
             print(f"🔄 [STAGING] Querying raw budget allocation table {raw_table}...")
             logging.info(f"🔄 [STAGING] Querying raw budget allocation table {raw_table}...")
             try:
-                df_raw = client.query(f"SELECT * FROM `{raw_table}`").to_dataframe()
+                df_raw = google_bigquery_client.query(f"SELECT * FROM `{raw_table}`").to_dataframe()
                 if df_raw.empty:
                     print(f"⚠️ [STAGING] Budget allocation table {table} is empty then query is skipped.")
                     logging.warning(f"⚠️ [STAGING] Budget allocation table {table} is empty then query is skipped.")
@@ -130,7 +143,7 @@ def staging_budget_allocation():
         print(f"✅ [STAGING] Successfully combined {len(df_all)} row(s) from all budget raw tables.")
         logging.info(f"✅ [STAGING] Successfully combined {len(df_all)} row(s) from all budget raw tables.")
 
-    # 1.1.4. Enrich budget allocation
+    # 1.1.5. Enrich budget allocation
         try:
             print(f"🔄 [STAGING] Enriching fields for {len(df_all)} row(s) of staging budget allocation field(s)...")
             logging.info(f"🔄 [STAGING] Enriching fields for {len(df_all)} row(s) of staging budget allocation field(s)...")
@@ -159,7 +172,7 @@ def staging_budget_allocation():
             logging.error(f"❌ [STAGING] Failed to enrich staging budget allocation due to {e}.")
             raise
 
-    # 1.1.5. Enforce schema for Facebook staging campaign insights
+    # 1.1.6. Enforce schema for Facebook staging campaign insights
         try:
             print(f"🔄 [STAGING] Enforcing schema for {len(df_all)} row(s) of staging budget allocation...")
             logging.info(f"🔄 [STAGING] Enforcing schema for {len(df_all)} row(s) of staging budget allocation...")
@@ -167,18 +180,14 @@ def staging_budget_allocation():
             print(f"✅ [STAGING] Successfully enforced {len(df_all)} row(s) of staging budget allocation.")
             logging.info(f"✅ [STAGING] Successfully enforced {len(df_all)} row(s) of Ftaging budget allocation.")
         except Exception as e:
-            print(f"❌ [INGEST] Failed to enforce schema for {len(df_all)} row(s) of staging budget allocation due to {e}.")
-            logging.error(f"❌ [INGEST] Failed to enforce schema for {len(df_all)} row(s) of staging budget allocation due to {e}.")
+            print(f"❌ [STAGING] Failed to enforce schema for {len(df_all)} row(s) of staging budget allocation due to {e}.")
+            logging.error(f"❌ [STAGING] Failed to enforce schema for {len(df_all)} row(s) of staging budget allocation due to {e}.")
             raise        
 
-    # 1.1.6. Upload Facebook staging campaign insights to Google BigQuery raw table        
+    # 1.1.7. Upload Facebook staging campaign insights to Google BigQuery raw table        
         try:
             print(f"🔍 [STAGING] Uploading {len(df_all)} row(s) of staging budget allocation table {staging_table_budget}...")
             logging.info(f"🔍 [STAGING] Uploading {len(df_all)} row(s) of staging budget allocation table {staging_table_budget}...")
-            try:
-                client = bigquery.Client(project=PROJECT)
-            except DefaultCredentialsError as e:
-                raise RuntimeError("❌ [STAGING] Failed to initialize Google BigQuery client due to credentials error.") from e
             if "special_event_name" in df_all.columns:
                 df_all["special_event_name"] = df_all["special_event_name"].where(
                     pd.notnull(df_all["special_event_name"]), None
@@ -192,7 +201,7 @@ def staging_budget_allocation():
                 source_format=bigquery.SourceFormat.PARQUET,
                 clustering_fields=clustering_fields if clustering_fields else None
             )
-            load_job = client.load_table_from_dataframe(
+            load_job = google_bigquery_client.load_table_from_dataframe(
                 df_all,
                 staging_table_budget,
                 job_config=job_config

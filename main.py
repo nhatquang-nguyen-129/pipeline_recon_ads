@@ -95,7 +95,7 @@ def main():
             print(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {thang} month due to {e}.")
             logging.error(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {thang} month due to {e}.")
 
-# 1.3. Entrypoint guard to run main() when this script is executed directly
+# 1.3. Entrypoint guard to run main.py when this script is executed directly
 if __name__ == "__main__":
     try:
         main()

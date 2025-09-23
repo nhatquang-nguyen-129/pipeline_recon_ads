@@ -61,16 +61,16 @@ LAYER = os.getenv("LAYER")
 # Get environment variable for Mode
 MODE = os.getenv("MODE")
 
-# 1. ENRICH BUDGET INSIGHTS FROM INGESTION PHASE
+# 1. ENRICH BUDGET ALLOCATION FROM INGESTION PHASE
 
-# 1.1. Enrich budget insights included standarization, timestamp formatting and source tagging
+# 1.1. Enrich budget allocation insights
 def enrich_budget_insights(df: pd.DataFrame) -> pd.DataFrame:
     print("🚀 [ENRICH] Starting to enrich raw budget data...")
     logging.info("🚀 [ENRICH] Starting to enrich raw budget data...")
     
     if df.empty:
-        print("⚠️ [ENRICH] Budget input dataframe is empty then enrichment is skipped.")
-        logging.warning("⚠️ [ENRICH] Budget input dataframe is empty then enrichment is skipped.")
+        print("⚠️ [ENRICH] Budget input Python DataFrame is empty then enrichment is skipped.")
+        logging.warning("⚠️ [ENRICH] Budget input Python DataFrame is empty then enrichment is skipped.")
         return df
     
     # 1.1.1. Add ingestion timestamp with last_update_at
@@ -87,14 +87,14 @@ def enrich_budget_insights(df: pd.DataFrame) -> pd.DataFrame:
 
 # 2. ENRICH BUDGET FIELDS FROM STAGING PHASE
 
-# 2.1. Enrich budget fields by adding derived fields such as month_key, classification fields and mapping keys
+# 2.1. Enrich budget fields by adding derived fields
 def enrich_budget_fields(df: pd.DataFrame, table_id: str) -> pd.DataFrame:
     print("🚀 [ENRICH] Starting to enrich budget staging data...")
     logging.info("🚀 [ENRICH] Starting to enrich budget staging data...")    
 
     if df.empty:
-        print("⚠️ [ENRICH] Budget input dataframe is empty then enrichment is skipped.")
-        logging.warning("⚠️ [ENRICH] Budget input dataframe is empty then enrichment is skipped.")
+        print("⚠️ [ENRICH] Budget input Python DataFrame is empty then enrichment is skipped.")
+        logging.warning("⚠️ [ENRICH] Budget input Python DataFrame is empty then enrichment is skipped.")
         return df
 
     # 2.1.1. Standardize platform classification
@@ -127,6 +127,8 @@ def enrich_budget_fields(df: pd.DataFrame, table_id: str) -> pd.DataFrame:
 
     # 2.1.3. Enrich metadata from table_id
     try:
+        print(f"🔍 [ENRICH] Adding budget metadata from table_id...")
+        logging.info(f"🔍 [ENRICH] Adding budget metadata from table_id...")
         table_name = table_id.split(".")[-1]
         match = re.search(
             r"^(?P<company>\w+)_table_budget_(?P<department>\w+)_(?P<account>\w+)_allocation_(?P<worksheet>\w+)$",
@@ -136,9 +138,9 @@ def enrich_budget_fields(df: pd.DataFrame, table_id: str) -> pd.DataFrame:
             df["department"] = match.group("department")
             df["account"] = match.group("account")
             df["worksheet"] = match.group("worksheet")
-            print("✅ [ENRICH] Successfully enriched budget metadata from table_id.")
-            logging.info("✅ [ENRICH] Successfully enriched budget metadata from table_id.")
+            print("✅ [ENRICH] Successfully added budget metadata from table_id.")
+            logging.info("✅ [ENRICH] Successfully added budget metadata from table_id.")
     except Exception as e:
-        print(f"⚠️ [ENRICH] Failed to enrich budget metadata: {e}")
-        logging.warning(f"⚠️ [ENRICH] Failed to enrich budget metadata: {e}")
+        print(f"⚠️ [ENRICH] Failed to enrich budget metadata due to {e}.")
+        logging.warning(f"⚠️ [ENRICH] Failed to enrich budget metadata due to {e}.")
     return df

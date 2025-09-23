@@ -17,19 +17,22 @@ budget allocation data from Google Sheets → staging → BigQuery.
 It only provides schema utilities to support other pipeline components.
 ===================================================================
 """
-# Add logging capability for tracking process execution and errors
+# Add logging ultilities for integration
 import logging
 
-# Add Python Pandas library for data processing
+# Add Python Pandas libraries for integration
 import pandas as pd
 
-# Add Python NumPy library for numerical computing and array operations
+# Add Python NumPy libraries for integration
 import numpy as np
 
-# 1. PROCESS SCHEMA FOR GIVEN PYTHON DATAFRAME IN BUDGET ALLOCAITON
+# 1. ENSURE SCHEMA FOR GIVEN PYTHON DATAFRAME IN BUDGET ALLOCAITON
 
 # 1.1. Ensure that the given DataFrame contains all required columns with correct datatypes for the specified schema type
 def ensure_table_schema(df: pd.DataFrame, schema_type: str) -> pd.DataFrame:
+    print(f"🔄 [SCHEMA] Enforce schema {schema_type} on Python DataFrame with {df.shape[1]} column(s)...")
+    logging.info(f"🔄 [SCHEMA] Enforce schema {schema_type} on Python DataFrame with {df.shape[1]} column(s)...")
+    
     mapping_budget_schema = {
         "fetch_budget_allocation": {
             "ma_ngan_sach_cap_1": str,
@@ -120,4 +123,6 @@ def ensure_table_schema(df: pd.DataFrame, schema_type: str) -> pd.DataFrame:
         except Exception as e:
             logging.warning(f"⚠️ Column '{col}' cannot be coerced to {dtype}: {e}")
     df = df[[col for col in expected_columns]]
+    print(f"✅ [SCHEMA] Successfully enforced schema {schema_type} on Python DataFrame with {df.shape[1]} column(s).")
+    logging.info(f"✅ [SCHEMA] Successfully enforced schema {schema_type} on Python DataFrame with {df.shape[1]} column(s).")
     return df

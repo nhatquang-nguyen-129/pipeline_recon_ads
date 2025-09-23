@@ -31,6 +31,12 @@ import logging
 import pandas as pd
 
 # Add Google Authentication libraries for integration
+from google.api_core.exceptions import (
+    GoogleAPICallError,
+    Forbidden,
+    NotFound,
+    PermissionDenied, 
+)
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
 from google.auth.transport.requests import AuthorizedSession
@@ -40,6 +46,7 @@ from google.api_core.exceptions import NotFound
 
 # Add Google Spreadsheets API libraries for integration
 import gspread
+from gspread.exceptions import SpreadsheetNotFound, WorksheetNotFound, APIError, GSpreadException
 
 # Add Google Secret Manager libraries for integration
 from google.cloud import secretmanager
@@ -88,28 +95,79 @@ def update_budget_allocation(thang: str) -> None:
     # 1.1.1. Start timing the update process
     start_time = time.time()
     
-    # 1.1.2. Initialize Google Sheets client
-    secret_client = secretmanager.SecretManagerServiceClient()
+    # 1.1.2. Initialize Google Secret Manager client
+    try:
+        print(f"🔍 [UPDATE] Initializing Google Secret Manager client for Google Cloud Platform project {PROJECT}...")
+        logging.info(f"🔍 [UPDATE] Initializing Google Secret Manager client for Google Cloud Platform project {PROJECT}...")
+        google_secret_client = secretmanager.SecretManagerServiceClient()
+        print(f"✅ [UPDATE] Successfully initialized Google Secret Manager client for Google Cloud project {PROJECT}.")
+        logging.info(f"✅ [UPDATE] Successfully initialized Google Secret Manager client for Google Cloud project {PROJECT}.")
+    except DefaultCredentialsError as e:
+        raise RuntimeError("❌ [UPDATE] Failed to initialize Google Secret Manager client due to credentials error.") from e
+    except PermissionDenied as e:
+        raise RuntimeError("❌ [UPDATE] Failed to initialize Google Secret Manager client due to permission denial.") from e
+    except NotFound as e:
+        raise RuntimeError("❌ [UPDATE] Failed to initialize Google Secret Manager client because secret not found.") from e
+    except GoogleAPICallError as e:
+        raise RuntimeError("❌ [UPDATE] Failed to initialize Google Secret Manager client due to API call error.") from e
+    except Exception as e:
+        raise RuntimeError(f"❌ [UPDATE] Failed to initialize Google Secret Manager client due to unexpected error {e}.") from e
+    
+    # 1.1.3. Prepare Google Secret Manager id(s)
+    print(f"🔍 [UPDATE] Retrieving budget information for {ACCOUNT} from Google Secret Manager...")
+    logging.info(f"🔍 [UPDATE] Retrieving budget information for {ACCOUNT} from Google Secret Manager...") 
     secret_id = f"{COMPANY}_secret_{DEPARTMENT}_{PLATFORM}_sheet_id_{ACCOUNT}"
     secret_name = f"projects/{PROJECT}/secrets/{secret_id}/versions/latest"
-    response = secret_client.access_secret_version(request={"name": secret_name})
+    response = google_secret_client.access_secret_version(request={"name": secret_name})
     sheet_id = response.payload.data.decode("UTF-8")
+    print(f"✅ [UPDATE] Successfully retrieved budget allocation sheet_id {sheet_id} for environment variable {ACCOUNT} from Google Secret Manager.")
+    logging.info(f"✅ [UPDATE] Successfully retrieved budget allocation sheet_id {sheet_id} for environment variable {ACCOUNT} from Google Secret Manager.")
+    
+    # 1.1.4. Initialize Google Sheets client
     try:
-        scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+        print(f"🔍 [UPDATE] Initializing Google Sheets client for sheet_id {sheet_id}...")
+        logging.info(f"🔍 [UPDATE] Initializing Google Sheets client for sheet_id {sheet_id}...")                
+        scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
         creds, _ = default(scopes=scopes)
-        gc = gspread.Client(auth=creds)
-        gc.session = AuthorizedSession(creds)
-        sh = gc.open_by_key(sheet_id)
-        worksheet_list = [ws.title for ws in sh.worksheets()]
+        google_gspread_client = gspread.Client(auth=creds)
+        google_gspread_client.session = AuthorizedSession(creds)
+        print(f"✅ [MART] Successfully initialized Google Sheets client for sheet_id {sheet_id} with scopes {scopes}.")
+        logging.info(f"✅ [MART] Successfully initialized Google Sheets client for sheet_id {sheet_id} with scopes {scopes}.")
+    except DefaultCredentialsError as e:
+        raise RuntimeError("❌ [MART] Failed to initialize Google Sheets client due to credentials error.") from e
+    except SpreadsheetNotFound as e:
+        raise RuntimeError(f"❌ [MART] Failed to initialize Google Sheets client because spreadsheet {sheet_id} not found.") from e
+    except WorksheetNotFound as e:
+        raise RuntimeError(f"❌ [MART] Failed to initialize Google Sheets client because worksheet not found in spreadsheet {sheet_id}.") from e
+    except APIError as e:
+        raise RuntimeError("❌ [MART] Failed to initialize Google Sheets client due to API error.") from e
+    except GSpreadException as e:
+        raise RuntimeError("❌ [MART] Failed to initialize Google Sheets client due to Gspread client error.") from e
     except Exception as e:
-        raise RuntimeError(f"❌ [UPDATE] Failed to init Google Sheets client due to {e}.")
+        raise RuntimeError(f"❌ [MART] Failed to initialize Google Sheets client due to {e}.") from e    
 
-    # 1.1.3. Prepare id(s)
+    # 1.1.5. Call Google Sheets API
+    try:
+        print(f"🔍 [UPDATE] Retrieving all worksheet(s) in Google Sheets file {sheet_id} for classification...")
+        logging.info(f"🔍 [UPDATE] Retrieving all worksheet(s) in Google Sheets file {sheet_id} for classification...")
+        sh = google_gspread_client.open_by_key(sheet_id)
+        worksheet_list = [ws.title for ws in sh.worksheets()]
+        print(f"✅ [UPDATE] Successfully retrieved {len(worksheet_list)} worksheet(s) from Google Sheets file {sheet_id}.")
+        logging.info(f"✅ [UPDATE] Successfully retrieved {len(worksheet_list)} worksheet(s) from Google Sheets file {sheet_id}.")
+    except Exception as e:
+        print(f"❌ [UPDATE] Failed to fetch data from worksheet(s) in {sheet_id} file due to {e}.")
+        logging.error(f"❌ [UPDATE] Failed to fetch data from worksheet(s) in {sheet_id} file due to {e}.")
+
+    # 1.1.6. Prepare id(s)
     year, month = thang.split("-")
     worksheet_monthly = f"m{int(month):02d}{year}"
     pattern_special = re.compile(rf".*{year}$")
     monthly_sheets = [ws for ws in worksheet_list if ws == worksheet_monthly]
     special_sheets = [ws for ws in worksheet_list if pattern_special.match(ws) and not ws.startswith("m")]
+    print(f"🔍 [UPDATE] Preparing to ingest {len(monthly_sheets)} monthly sheet(s) included {monthly_sheets} "
+          f"and {len(special_sheets)} special sheet(s) included {special_sheets}.")
+    logging.info(f"🔍 [UPDATE] Preparing to ingest {len(monthly_sheets)} monthly sheet(s) included {monthly_sheets} "
+          f"and {len(special_sheets)} special sheet(s) included {special_sheets}.")
 
     # 1.1.4. Ingest monthly budget
     df_monthly = None
