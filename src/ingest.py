@@ -53,7 +53,7 @@ from google.cloud import bigquery
 # Add internal Google Sheet module for handing
 from src.enrich import enrich_budget_insights
 from src.fetch import fetch_budget_allocation
-from src.schema import ensure_table_schema
+from src.schema import enforce_table_schema
 
 # Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
@@ -80,12 +80,11 @@ MODE = os.getenv("MODE")
 
 # 1.1. Ingest Budget Allocation to Google BigQuery
 def ingest_budget_allocation(
-    sheet_id: str,
-    worksheet_name: str,
-    thang: str,
+    ingest_id_sheet: str,
+    ingest_name_sheet: str
 ) -> pd.DataFrame:
-    print(f"🚀 [INGEST] Starting to ingest budget allocation for month {thang}...")
-    logging.info(f"🚀 [INGEST] Starting to ingest budget allocation for month {thang}...")
+    print(f"🚀 [INGEST] Starting to ingest budget allocation for sheet name {ingest_name_sheet} in Google Sheet sheet_id {ingest_id_sheet}..")
+    logging.info(f"🚀 [INGEST] Starting to ingest budget allocation for sheet name {ingest_name_sheet} in Google Sheet sheet_id {ingest_id_sheet}..")
 
     # 1.1.1. Start timing Budget Allocation ingestion
     ingest_time_start = time.time()
@@ -96,47 +95,62 @@ def ingest_budget_allocation(
 
     try:
 
-    # 1.1.1. Fetch data from Google Sheet API
-    try:
-        print(f"🔁 [INGEST] Triggering to fetch budget allocation for month {thang} in worksheet {sheet_id} from Google Sheets file {sheet_id}...")
-        logging.info(f"🔁 [INGEST] Triggering to fetch budget allocation for month {thang} in worksheet {sheet_id} from Google Sheets file {sheet_id}...")        
-        df = fetch_budget_allocation(sheet_id, worksheet_name)
-        df = df[df["thang"].astype(str) == str(thang)]
-        if df.empty:
-            print(f"⚠️ [INGEST] No records found for month {thang} in worksheet {worksheet_name} from Google Sheets file {sheet_id}.")
-            logging.warning(f"⚠️ [INGEST] No records found for month {thang} in worksheet {worksheet_name} from Google Sheets file {sheet_id}.")
-            return df
-    except Exception as e:
-        print(f"❌ [INGEST] Failed to trigger budget allocation fetch for month {thang} due to {e}.")
-        logging.error(f"❌ [INGEST] Failed to trigger budget allocation fetch for month {thang} due to {e}.")
-        return pd.DataFrame()
-
-    # 1.1.2 Enrich Python DataFrame
-    try:
-        print(f"🔁 [INGEST] Triggering to enrich budget allocation for month {thang} with {len(df)} row(s)...")
-        logging.info(f"🔁 [INGEST] Triggering to enrich budget allocation for month {thang} with {len(df)} row(s)...")
-        df = enrich_budget_insights(df)
-        df["last_updated_at"] = datetime.utcnow().replace(tzinfo=pytz.UTC)
-    except Exception as e:
-        print(f"❌ [INGEST] Failed to trigger budget allocation enrichment for {thang} due to {e}.")
-        logging.error(f"❌ [INGEST] Failed to trigger budget allocation enrichment for {thang} due to {e}.")
-        raise
-
-    # 1.1.3. Prepare id
-    raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"
-    table_id = f"{PROJECT}.{raw_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_{worksheet_name}"
-    print(f"🔍 [INGEST] Proceeding to ingest budget allocation for {thang} with {table_id} table_id...")
-    logging.info(f"🔍 [INGEST] Proceeding to ingest budget allocation for {thang} with {table_id} table_id...")
+    # 1.1.2. Trigger to fetch Budget Allocation
+        ingest_section_name = "[INGEST] Trigger to fetch Budget Allocation"
+        ingest_section_start = time.time()        
+        try:
+            print(f"🔁 [INGEST] Triggering to fetch Budget Allocation for sheet name {ingest_name_sheet} from Google Sheets sheet_id {ingest_id_sheet}...")
+            logging.info(f"🔁 [INGEST] Triggering to fetch Budget Allocation for sheet name {ingest_name_sheet} from Google Sheets sheet_id {ingest_id_sheet}...")
+            ingest_results_fetched = fetch_budget_allocation(fetch_id_sheet=ingest_id_sheet, fetch_name_sheet=ingest_name_sheet)
+            ingest_df_fetched = ingest_results_fetched["fetch_df_final"]
+            ingest_status_fetched = ingest_results_fetched["fetch_status_final"]
+            ingest_summary_fetched = ingest_results_fetched["fetch_summary_final"]
+            if ingest_status_fetched == "fetch_succeed_all":
+                print(f"✅ [INGEST] Successfully triggered Budget Allocation fetching for {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")
+                logging.info(f"✅ [INGEST] Successfully triggered Budget Allocation fetching for {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")
+                ingest_sections_status[ingest_section_name] = "succeed"
+            elif ingest_status_fetched == "fetch_succeed_partial":
+                print(f"⚠️ [INGEST] Partially triggered Budget Allocation fetching {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")
+                logging.warning(f"⚠️ [INGEST] Partially triggered Budget Allocation fetching {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")
+                ingest_sections_status[ingest_section_name] = "partial"
+            else:
+                ingest_sections_status[ingest_section_name] = "failed"
+                print(f"❌ [INGEST] Failed to trigger Budget Allocation fetching with {ingest_summary_fetched['fetch_rows_output']} fetched row(s) due to {', '.join(ingest_summary_fetched['fetch_sections_failed'])} or unknown error in {ingest_summary_fetched['fetch_time_elapsed']}s.")
+                logging.error(f"❌ [INGEST] Failed to trigger Budget Allocation fetching with {ingest_summary_fetched['fetch_rows_output']} fetched row(s) due to {', '.join(ingest_summary_fetched['fetch_sections_failed'])} or unknown error in {ingest_summary_fetched['fetch_time_elapsed']}s.")
+        finally:
+            ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
     
-    # 1.1.4. Enforce schema
-    try:
-        print(f"🔄 [INGEST] Triggering to enforce schema for {len(df)} row(s) of budget allocation...")
-        logging.info(f"🔄 [INGEST] Triggering to enforce schema for {len(df)} row(s) of budget allocation...")
-        df = ensure_table_schema(df, "ingest_budget_allocation")
-    except Exception as e:
-        print(f"❌ [INGEST] Failed to trigger schema enforcement for budget allocation due to {e}.")
-        logging.error(f"❌ [INGEST] Failed to trigger schema enforcement for budget allocation due to {e}.")
-        raise
+    # 1.1.3. Prepare Google BigQuery table_id for ingestion
+        ingest_section_name = "[INGEST] Prepare Google BigQuery table_id for ingestion"
+        ingest_section_start = time.time()    
+        try:            
+            raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"
+            raw_table_budget = f"{PROJECT}.{raw_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_{ingest_name_sheet}"
+            print(f"🔍 [INGEST] Proceeding to ingest Budget Allocation for {len(ingest_df_fetched)} fetched row(s) with Google BigQuery table_id {raw_table_budget}...")
+            logging.info(f"🔍 [INGEST] Proceeding to ingest Budget Allocation for {len(ingest_df_fetched)} fetched row(s) with Google BigQuery table_id {raw_table_budget}...")
+        finally:
+            ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
+    
+    # 1.1.4. Trigger to enforce schema for Budget Allocation
+        ingest_section_name = "[INGEST] Trigger to enforce schema for Budget Allocation"
+        ingest_section_start = time.time()
+        try:
+            print(f"🔄 [INGEST] Triggering to enforce schema for Budget Allocation with {len(ingest_df_fetched)} row(s)...")
+            logging.info(f"🔄 [INGEST] Triggering to enforce schema for Budget Allocation with {len(ingest_df_fetched)} row(s)...")
+            ingest_results_enforced = enforce_table_schema(ingest_df_fetched, "ingest_budget_allocation")
+            ingest_summary_enforced = ingest_results_enforced["schema_summary_final"]
+            ingest_status_enforced = ingest_results_enforced["schema_status_final"]
+            ingest_df_enforced = ingest_results_enforced["schema_df_final"]    
+            if ingest_status_enforced == "schema_succeed_all":
+                print(f"✅ [INGEST] Successfully triggered Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
+                logging.info(f"✅ [INGEST] Successfully triggered Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
+                ingest_sections_status[ingest_section_name] = "succeed"
+            else:
+                ingest_sections_status[ingest_section_name] = "failed"
+                print(f"❌ [INGEST] Failed to trigger Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) due to failed section(s) {', '.join(ingest_summary_enforced['schema_sections_failed'])} in {ingest_summary_enforced['fetch_time_elapsed']}s.")
+                logging.error(f"❌ [INGEST] Failed to trigger Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) due to failed section(s) {', '.join(ingest_summary_enforced['schema_sections_failed'])} in {ingest_summary_enforced['fetch_time_elapsed']}s.")
+        finally:
+            ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
 
     # 1.1.5. Delete existing row(s) by "thang" or create new table if not exist
     try:
