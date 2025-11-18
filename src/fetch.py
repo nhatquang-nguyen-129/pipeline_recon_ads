@@ -44,7 +44,7 @@ import gspread
 from gspread.exceptions import SpreadsheetNotFound, WorksheetNotFound, APIError, GSpreadException
 
 # Add internal Budget module for handling
-from config.schema import ensure_table_schema
+from src.schema import ensure_table_schema
 
 # Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 

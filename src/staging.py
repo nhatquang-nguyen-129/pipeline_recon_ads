@@ -39,7 +39,7 @@ from google.api_core.exceptions import Forbidden, GoogleAPICallError
 from google.cloud import bigquery
 
 # Add internal Budget module for handling
-from config.schema import ensure_table_schema
+from src.schema import ensure_table_schema
 from src.enrich import enrich_budget_fields
 
 # Get environment variable for Company

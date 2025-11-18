@@ -48,7 +48,7 @@ from google.cloud import bigquery
 import gspread
 
 # Add internal Google Sheet module for configuration
-from config.schema import ensure_table_schema
+from src.schema import ensure_table_schema
 
 # Add internal Google Sheet module for handing
 from src.enrich import enrich_budget_insights
