@@ -68,7 +68,16 @@ MODE = os.getenv("MODE")
 # 1. ENRRICH BUDGET ALLOCATION FROM INGESTION PHASE
 
 # 1.1. Enrich budget allocation from ingestion phase
+def enrich_budget_insights(enrich_df_input: pd.DataFrame) -> pd.DataFrame:
+    print(f"🚀 [ENRICH] Starting to enrich raw Budget Allocation for {len(enrich_df_input)} row(s)...")
+    logging.info(f"🚀 [ENRICH] Starting to enrich raw Facebook Ads campaign insights for {len(enrich_df_input)} row(s)....")
 
+    # 1.1.1. Start timing the raw Facebook Ads campaign insights enrichment
+    enrich_time_start = time.time()   
+    enrich_sections_status = {}
+    enrich_sections_time = {}
+    print(f"🔍 [ENRICH] Proceeding to enrich raw Facebook Ads campaign insights for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    logging.info(f"🔍 [ENRICH] Proceeding to enrich raw Facebook Ads campaign insights for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
     # 1.1.4. Normalize column names to snake_case
     try:
         print(f"🔄 [FETCH] Normalizing name for {len(df.columns)} column(s) in budget allocation...")
