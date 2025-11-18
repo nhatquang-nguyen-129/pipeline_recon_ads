@@ -70,9 +70,9 @@ MODE = os.getenv("MODE")
 # 1. FETCH BUDGET ALLCATION
 
 # 1.1. Fetch Budget Allcation from Google Sheets
-def fetch_budget_allocation(sheet_id: str, worksheet_name: str) -> pd.DataFrame:
-    print(f"🚀 [FETCH] Starting to fetch budget allocation from {worksheet_name} worksheet in {sheet_id} Google Sheets sheet_id...")
-    logging.info(f"🚀 [FETCH] Starting to fetch budget allocation from {worksheet_name} worksheet in {sheet_id} Google Sheets sheet_id...")
+def fetch_budget_allocation(fetch_id_sheet: str, fetch_name_sheet: str) -> pd.DataFrame:
+    print(f"🚀 [FETCH] Starting to fetch budget allocation from {fetch_name_sheet} sheet name in {fetch_id_sheet} Google Sheets sheet_id...")
+    logging.info(f"🚀 [FETCH] Starting to fetch budget allocation from {fetch_name_sheet} sheet name in {fetch_id_sheet} Google Sheets sheet_id...")
 
     # 1.1.1. Start timing the Budget Allocation fetching
     fetch_time_start = time.time()   
@@ -87,14 +87,14 @@ def fetch_budget_allocation(sheet_id: str, worksheet_name: str) -> pd.DataFrame:
         fetch_section_name = "[FETCH] Initialize Google Sheets client"
         fetch_section_start = time.time()            
         try:
-            print(f"🔍 [FETCH] Initializing Google Sheets client for sheet_id {sheet_id}...")
-            logging.info(f"🔍 [FETCH] Initializing Google Sheets client for sheet_id {sheet_id}...")                
+            print(f"🔍 [FETCH] Initializing Google Sheets client for sheet_id {fetch_id_sheet}...")
+            logging.info(f"🔍 [FETCH] Initializing Google Sheets client for sheet_id {fetch_id_sheet}...")                
             scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
             creds, _ = default(scopes=scopes)
             google_gspread_client = gspread.Client(auth=creds)
             google_gspread_client.session = AuthorizedSession(creds)
-            print(f"✅ [FETCH] Successfully initialized Google Sheets client for sheet_id {sheet_id} with scopes {scopes}.")
-            logging.info(f"✅ [FETCH] Successfully initialized Google Sheets client for sheet_id {sheet_id} with scopes {scopes}.")
+            print(f"✅ [FETCH] Successfully initialized Google Sheets client for sheet_id {fetch_id_sheet} with scopes {scopes}.")
+            logging.info(f"✅ [FETCH] Successfully initialized Google Sheets client for sheet_id {fetch_id_sheet} with scopes {scopes}.")
             fetch_sections_status[fetch_section_name] = "succeed"
         except Exception as e:
             fetch_sections_status[fetch_section_name] = "failed"
@@ -107,15 +107,15 @@ def fetch_budget_allocation(sheet_id: str, worksheet_name: str) -> pd.DataFrame:
         fetch_section_name = "[FETCH] Make Google Sheets API call for worksheet recording"
         fetch_section_start = time.time()             
         try:
-            print(f"🔍 [FETCH] Retrieving {worksheet_name} in Google Sheets file {sheet_id} from Google Sheets API...")
-            logging.info(f"🔍 [FETCH] Retrieving {worksheet_name} in Google Sheets file {sheet_id} from Google Sheets API...")
-            fetch_worksheet_budget = google_gspread_client.open_by_key(sheet_id).worksheet(worksheet_name)
+            print(f"🔍 [FETCH] Retrieving {fetch_name_sheet} in Google Sheets file {fetch_id_sheet} from Google Sheets API...")
+            logging.info(f"🔍 [FETCH] Retrieving {fetch_name_sheet} in Google Sheets file {fetch_id_sheet} from Google Sheets API...")
+            fetch_worksheet_budget = google_gspread_client.open_by_key(fetch_id_sheet).worksheet(fetch_name_sheet)
             fetch_records_responsed = fetch_worksheet_budget.get_all_records()
-            print(f"✅ [FETCH] Successfully retrieved {len(fetch_records_responsed)} row(s) from {worksheet_name} in Google Sheets file {sheet_id}.")
-            logging.info(f"✅ [FETCH] Successfully retrieved {len(fetch_records_responsed)} row(s) from {worksheet_name} in Google Sheets file {sheet_id}.")
+            print(f"✅ [FETCH] Successfully retrieved {len(fetch_records_responsed)} row(s) from {fetch_name_sheet} in Google Sheets file {fetch_id_sheet}.")
+            logging.info(f"✅ [FETCH] Successfully retrieved {len(fetch_records_responsed)} row(s) from {fetch_name_sheet} in Google Sheets file {fetch_id_sheet}.")
             if not fetch_records_responsed:
-                print(f"⚠️ [FETCH] No data found in {worksheet_name} worksheet then empty DataFrame will be returned.")
-                logging.warning(f"⚠️ [FETCH] No data found in {worksheet_name} worksheet then empty DataFrame will be returned.")
+                print(f"⚠️ [FETCH] No data found in {fetch_name_sheet} worksheet then empty DataFrame will be returned.")
+                logging.warning(f"⚠️ [FETCH] No data found in {fetch_name_sheet} worksheet then empty DataFrame will be returned.")
                 return pd.DataFrame()
             fetch_df_flattened = pd.DataFrame(fetch_records_responsed).replace("", None)
             fetch_sections_status[fetch_section_name] = "succeed"

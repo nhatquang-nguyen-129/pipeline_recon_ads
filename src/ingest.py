@@ -2,19 +2,23 @@
 ==================================================================
 BUDGET INGESTION MODULE
 ------------------------------------------------------------------
-This module ingests budget allocation data from Google Sheets into 
-Google BigQuery, forming the raw data layer of the marketing pipeline.
+This module ingests raw data from the Budget Allocation fetching 
+module into Google BigQuery, establishing the foundational raw 
+layer used for centralized storage and historical retention.
 
-It reads structured budget data from predefined worksheets, performs 
-basic cleaning (e.g. normalizing column names, coercing numeric fields), 
-and loads them into partitioned BigQuery tables per sheet/month.
+It manages the complete ingestion flow from authentication and 
+data fetching, to enrichment, schema validation and loading into 
+Google BigQuery tables.
 
-✔️ Uses Google Sheets API via `gspread` with service account auth  
-✔️ Supports sheet filtering and naming normalization per config  
-✔️ Automatically writes to BigQuery with schema autodetect (WRITE_TRUNCATE)
+✔️ Supports both append and truncate modes via write_disposition
+✔️ Validates data structure using centralized schema utilities  
+✔️ Integrates enrichment routines before loading into BigQuery  
+✔️ Implements granular logging and CSV-based error traceability  
+✔️ Ensures pipeline reliability through retry and checkpoint logic  
 
-⚠️ This module is strictly limited to *raw-layer ingestion*.  
-It does **not** handle staging, aggregation, or mart-level logic.
+⚠️ This module is dedicated solely to *raw-layer ingestion*.  
+It does **not** handle advanced transformations, metric modeling, 
+or aggregated data processing beyond the ingestion boundary.
 ==================================================================
 """
 # Add root directory to sys.path for absolute imports of internal modules
@@ -31,28 +35,25 @@ import logging
 # Add Python Pandas library for integration
 import pandas as pd
 
+# Add Python time ultilities for integration
+import time
+
 # Add timezone ultilites for integration
 import pytz
 
 # Add UUID libraries for integration
 import uuid
 
-# Add Google Authentication libraries for integration
-from google.api_core.exceptions import Forbidden, GoogleAPICallError
-from google.auth.exceptions import DefaultCredentialsError
+# Add Google API core modules for integration
+from google.api_core.exceptions import NotFound
 
 # Add Google Cloud library for integration
 from google.cloud import bigquery
 
-# Add Google Sheet libraries for integration
-import gspread
-
-# Add internal Google Sheet module for configuration
-from src.schema import ensure_table_schema
-
 # Add internal Google Sheet module for handing
 from src.enrich import enrich_budget_insights
 from src.fetch import fetch_budget_allocation
+from src.schema import ensure_table_schema
 
 # Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
@@ -75,17 +76,25 @@ LAYER = os.getenv("LAYER")
 # Get environment variable for Mode
 MODE = os.getenv("MODE")
 
-# 1. INGEST BUDGET ALLOCATION FROM GOOGLE SHEETS TO GOOGLE BIGQUERY RAW TABLE
+# 1. INGEST BUDGET ALLOCATION
 
-# 1.1. Ingest budget allocation from Google Sheets to Google BigQuery raw table
+# 1.1. Ingest Budget Allocation to Google BigQuery
 def ingest_budget_allocation(
     sheet_id: str,
     worksheet_name: str,
     thang: str,
 ) -> pd.DataFrame:
-
     print(f"🚀 [INGEST] Starting to ingest budget allocation for month {thang}...")
     logging.info(f"🚀 [INGEST] Starting to ingest budget allocation for month {thang}...")
+
+    # 1.1.1. Start timing Budget Allocation ingestion
+    ingest_time_start = time.time()
+    ingest_sections_status = {}
+    ingest_sections_time = {}
+    print(f"🔍 [INGEST] Proceeding to ingest raw Budget Allocation at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    logging.info(f"🔍 [INGEST] Proceeding to ingest raw Budget Allocation at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+
+    try:
 
     # 1.1.1. Fetch data from Google Sheet API
     try:
