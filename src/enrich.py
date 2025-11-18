@@ -67,86 +67,137 @@ MODE = os.getenv("MODE")
 
 # 1. ENRRICH BUDGET ALLOCATION FROM INGESTION PHASE
 
-# 1.1. Enrich budget allocation from ingestion phase
+# 1.1. Enrich Budget Allocation from ingestion phase
 def enrich_budget_insights(enrich_df_input: pd.DataFrame) -> pd.DataFrame:
     print(f"🚀 [ENRICH] Starting to enrich raw Budget Allocation for {len(enrich_df_input)} row(s)...")
-    logging.info(f"🚀 [ENRICH] Starting to enrich raw Facebook Ads campaign insights for {len(enrich_df_input)} row(s)....")
+    logging.info(f"🚀 [ENRICH] Starting to enrich raw Budget Allocation for {len(enrich_df_input)} row(s)...")
 
-    # 1.1.1. Start timing the raw Facebook Ads campaign insights enrichment
+    # 1.1.1. Start timing the raw Budget Allocation enrichment
     enrich_time_start = time.time()   
     enrich_sections_status = {}
     enrich_sections_time = {}
-    print(f"🔍 [ENRICH] Proceeding to enrich raw Facebook Ads campaign insights for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
-    logging.info(f"🔍 [ENRICH] Proceeding to enrich raw Facebook Ads campaign insights for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
-    # 1.1.4. Normalize column names to snake_case
+    print(f"🔍 [ENRICH] Proceeding to enrich raw Budget Allocation for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    logging.info(f"🔍 [ENRICH] Proceeding to enrich raw Budget Allocation for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    
     try:
-        print(f"🔄 [FETCH] Normalizing name for {len(df.columns)} column(s) in budget allocation...")
-        logging.info(f"🔄 [FETCH] Normalizing name for {len(df.columns)} column(s) in budget allocation...")
-        df.columns = [
-            re.sub(r'(?<!^)(?=[A-Z])', '_', col.strip()).replace(" ", "_").lower()
-            for col in df.columns
-        ]
-        print(f"✅ [FETCH] Successfully normalized name for {len(df.columns)} column(s) in budget allocation.")
-        logging.info(f"✅ [FETCH] Successfully normalized name for {len(df.columns)} column(s) in budget allocation.")
-        if df.empty:
-            print("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then normalization is skipped.")
-            logging.warning("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then normalization is skipped.")   
-    except Exception as e:
-        print(f"❌ [FETCH] Failed to normalize column name(s) from budget allocation due to {e}.")
-        logging.error(f"❌ [FETCH] Failed to normalize column name(s) from budget allocation due to {e}.")
+    
+    # 1.1.2. Enrich column(s) name by normalizing to snake_case
+        enrich_section_name = "[ENRICH] Enrich column(s) name by normalizing to snake_case"
+        enrich_section_start = time.time()    
+        try:
+            print(f"🔄 [ENRICH] Normalizing name for {len(enrich_df_input.columns)} column(s) of Budget Allocation...")
+            logging.info(f"🔄 [ENRICH] Normalizing name for {len(enrich_df_input.columns)} column(s) of Budget Allocation...")
+            enrich_df_normalized = enrich_df_input.copy()            
+            enrich_df_normalized.columns = [
+                re.sub(r'(?<!^)(?=[A-Z])', '_', col.strip()).replace(" ", "_").lower()
+                for col in enrich_df_normalized.columns
+            ]
+            print(f"✅ [ENRICH] Successfully normalized name for {len(enrich_df_normalized.columns)} column(s) in budget allocation.")
+            logging.info(f"✅ [ENRICH] Successfully normalized name for {len(enrich_df_normalized.columns)} column(s) in budget allocation.")
+        except Exception as e:
+            enrich_sections_status[enrich_section_name] = "failed"
+            print(f"❌ [ENRICH] Failed to normalize column(s) name of Budget Allocation due to {e}.")
+            logging.error(f"❌ [ENRICH] Failed to normalize column(s) name of Budget Allocation due to {e}.")
+        finally:
+            enrich_sections_time[enrich_section_name] = round(time.time() - enrich_section_start, 2)
 
-    # 1.1.4. Remove unicode accent(s)
-    try:
-        print(f"🔄 [FETCH] Removing unicode accent(s) for {len(df.columns)} column name(s) in budget allocation...")
-        logging.info(f"🔄 [FETCH] Removing unicode accent(s) for {len(df.columns)} column name(s) in budget allocation...")
-        vietnamese_map = {
-            'á': 'a', 'à': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
-            'ă': 'a', 'ắ': 'a', 'ằ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
-            'â': 'a', 'ấ': 'a', 'ầ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
-            'đ': 'd',
-            'é': 'e', 'è': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
-            'ê': 'e', 'ế': 'e', 'ề': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
-            'í': 'i', 'ì': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
-            'ó': 'o', 'ò': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
-            'ô': 'o', 'ố': 'o', 'ồ': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
-            'ơ': 'o', 'ớ': 'o', 'ờ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
-            'ú': 'u', 'ù': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
-            'ư': 'u', 'ứ': 'u', 'ừ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
-            'ý': 'y', 'ỳ': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
-        }
-        vietnamese_map_upper = {k.upper(): v.upper() for k, v in vietnamese_map.items()}
-        full_map = {**vietnamese_map, **vietnamese_map_upper}
-        df.columns = [
-            ''.join(full_map.get(c, c) for c in col) if isinstance(col, str) else col
-            for col in df.columns
-        ]
-        print(f"✅ [FETCH] Successfully removed unicode accent(s) for {len(df.columns)} column name(s) in budget allocation.")
-        logging.info(f"✅ [FETCH] Successfully removed unicode accent(s) for {len(df.columns)} column name(s) in budget allocation.")
-        if df.empty:
-            print("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then unicode accent(s) removal is skipped.")
-            logging.warning("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then unicode accent(s) removal is skipped.")   
-    except Exception as e:
-        print(f"❌ [FETCH] Failed to remove unicode accent(s) from budget column name(s) due to {e}.")
-        logging.error(f"❌ [FETCH] Failed to remove unicode accent(s) from budget column name(s) due to {e}.")
+    # 1.1.3. Enrich column(s) name by unicode accent removal
+        enrich_section_name = "[ENRICH] Enrich column(s) name by unicode accent removal"
+        enrich_section_start = time.time()      
+        try:
+            print(f"🔄 [FETCH] Removing unicode accent(s) for {len(enrich_df_normalized.columns)} column(s) name(s) in budget allocation...")
+            logging.info(f"🔄 [FETCH] Removing unicode accent(s) for {len(enrich_df_normalized.columns)} column(s) name(s) in budget allocation...")
+            enrich_df_accent = enrich_df_normalized.copy()
+            vietnamese_map_all = {
+                'á': 'a', 'à': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+                'ă': 'a', 'ắ': 'a', 'ằ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+                'â': 'a', 'ấ': 'a', 'ầ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+                'đ': 'd',
+                'é': 'e', 'è': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+                'ê': 'e', 'ế': 'e', 'ề': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+                'í': 'i', 'ì': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+                'ó': 'o', 'ò': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+                'ô': 'o', 'ố': 'o', 'ồ': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+                'ơ': 'o', 'ớ': 'o', 'ờ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+                'ú': 'u', 'ù': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+                'ư': 'u', 'ứ': 'u', 'ừ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+                'ý': 'y', 'ỳ': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+            }
+            vietnamese_map_upper = {k.upper(): v.upper() for k, v in vietnamese_map_all.items()}
+            full_map = {**vietnamese_map_all, **vietnamese_map_upper}
+            enrich_df_accent.columns = [
+                ''.join(full_map.get(c, c) for c in col) if isinstance(col, str) else col
+                for col in enrich_df_accent.columns
+            ]
+            print(f"✅ [ENRICH] Successfully removed unicode accent(s) for {len(enrich_df_accent.columns)} column(s) name in Budget allocation.")
+            logging.info(f"✅ [ENRICH] Successfully removed unicode accent(s) for {len(enrich_df_accent.columns)} column(s) name in Budget allocation.")
+            enrich_sections_status[enrich_section_name] = "succeed"
+        except Exception as e:
+            print(f"❌ [FETCH] Failed to remove unicode accent(s) from Budget Allocation column name due to {e}.")
+            logging.error(f"❌ [FETCH] Failed to remove unicode accent(s) from Budget Allocation column name due to {e}.")
+        finally:
+            enrich_sections_time[enrich_section_name] = round(time.time() - enrich_section_start, 2)                    
 
-# 1. ENRICH BUDGET ALLOCATION FROM STAGING PHASE
+    # 1.1.4. Summarize enrich result(s) for raw Budget Allocation
+    finally:
+        enrich_time_elapsed = round(time.time() - enrich_time_start, 2)
+        enrich_df_final = enrich_df_accent.copy() if not enrich_df_accent.empty else pd.DataFrame()
+        enrich_sections_total = len(enrich_sections_status)
+        enrich_sections_failed = [k for k, v in enrich_sections_status.items() if v == "failed"]
+        enrich_sections_succeeded = [k for k, v in enrich_sections_status.items() if v == "succeed"]
+        enrich_rows_input = len(enrich_df_input)
+        enrich_rows_output = len(enrich_df_final)
+        enrich_sections_summary = list(dict.fromkeys(
+            list(enrich_sections_status.keys()) +
+            list(enrich_sections_time.keys())
+        ))
+        enrich_sections_detail = {
+            enrich_section_summary: {
+                "status": enrich_sections_status.get(enrich_section_summary, "unknown"),
+                "time": enrich_sections_time.get(enrich_section_summary, None),
+            }
+            for enrich_section_summary in enrich_sections_summary
+        }        
+        if any(v == "failed" for v in enrich_sections_status.values()):
+            print(f"❌ [ENRICH] Failed to complete raw Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) due to section(s) {', '.join(enrich_sections_failed)} in {enrich_time_elapsed}s.")
+            logging.error(f"❌ [ENRICH] Failed to complete raw Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) due to section(s) {', '.join(enrich_sections_failed)} in {enrich_time_elapsed}s.")
+            enrich_status_final = "enrich_failed_all"        
+        else:
+            print(f"🏆 [ENRICH] Successfully completed raw Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) in {enrich_time_elapsed}s.")
+            logging.info(f"🏆 [ENRICH] Successfully completed raw Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) in {enrich_time_elapsed}s.")
+            enrich_status_final = "enrich_succeed_all"                 
+        enrich_results_final = {
+            "enrich_df_final": enrich_df_final,
+            "enrich_status_final": enrich_status_final,
+            "enrich_summary_final": {
+                "enrich_time_elapsed": enrich_time_elapsed,
+                "enrich_sections_total": enrich_sections_total,
+                "enrich_sections_succeed": enrich_sections_succeeded,
+                "enrich_sections_failed": enrich_sections_failed,
+                "enrich_sections_detail": enrich_sections_detail,
+                "enrich_rows_input": enrich_rows_input,
+                "enrich_rows_output": enrich_rows_output,
+            },
+        }    
+    return enrich_results_final
 
-# 1.1. Enrich budget allocation from staging phase
+# 2. ENRICH BUDGET ALLOCATION FROM STAGING PHASE
+
+# 2.1. Enrich budget allocation from staging phase
 def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) -> pd.DataFrame:
     print(f"🚀 [ENRICH] Starting to enrich staging Budget Allocation for {len(enrich_df_input)} row(s)...")
     logging.info(f"🚀 [ENRICH] Starting to enrich staging Budget Allocation for {len(enrich_df_input)} row(s)...")
 
-    # 1.1.1. Start timing the staging Budget Allocation enrichment
+    # 2.1.1. Start timing the staging Budget Allocation enrichment
     enrich_time_start = time.time()   
     enrich_sections_status = {}
     enrich_sections_time = {}
     enrich_df_table = pd.DataFrame()
-    enrich_df_budget = pd.DataFrame()
     enrich_df_other = pd.DataFrame()
     print(f"🔍 [ENRICH] Proceeding to enrich staging Budget Allocation for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
     logging.info(f"🔍 [ENRICH] Proceeding to enrich staging Budget Allocation for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
 
-    # 1.1.2. Validate input for the staging Budget Allocation enrichment
+    # 2.1.2. Validate input for the staging Budget Allocation enrichment
     enrich_section_name = "[ENRICH] Validate input for the staging Budget Allocation enrichment"
     enrich_section_start = time.time()    
     try:
@@ -163,7 +214,7 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
 
     try:
 
-    # 1.1.3. Enrich table field(s) for staging Budget Allocation
+    # 2.1.3. Enrich table field(s) for staging Budget Allocation
         enrich_section_name = "[ENRICH] Enrich table field(s) for staging Budget Allocation"
         enrich_section_start = time.time()            
         try: 
@@ -193,7 +244,7 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
         finally:
             enrich_sections_time[enrich_section_name] = round(time.time() - enrich_section_start, 2)
 
-    # 1.1.4. Enrich internal field(s) for staging Budget Allocation
+    # 2.1.4. Enrich internal field(s) for staging Budget Allocation
         enrich_section_name = "[ENRICH] Enrich internal field(s) for staging Budget Allocation"
         enrich_section_start = time.time()            
         try:
@@ -211,7 +262,7 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
         finally:
             enrich_sections_time[enrich_section_name] = round(time.time() - enrich_section_start, 2)
 
-    # 1.1.5. Enrich other field(s) for staging Budget Allocation
+    # 2.1.5. Enrich other field(s) for staging Budget Allocation
         enrich_section_name = "[ENRICH] Enrich other field(s) for staging Budget Allocation"
         enrich_section_start = time.time()            
         try:
@@ -231,7 +282,7 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
         finally:
             enrich_sections_time[enrich_section_name] = round(time.time() - enrich_section_start, 2) 
 
-    # 1.1.6. Summarize enrichment result(s) for staging Budget Allocation
+    # 2.1.6. Summarize enrichment result(s) for staging Budget Allocation
     finally:
         enrich_time_elapsed = round(time.time() - enrich_time_start, 2)
         enrich_df_final = enrich_df_other.copy() if not enrich_df_other.empty else pd.DataFrame()
