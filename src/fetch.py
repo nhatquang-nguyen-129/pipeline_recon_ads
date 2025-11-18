@@ -14,37 +14,37 @@ intended to be used as part of the ETL pipeline's extraction layer.
 ✔️ Loads budget data from configured Google Sheets tabs  
 ✔️ Maps sheet-to-category via hardcoded internal mapping  
 ✔️ Returns clean pandas DataFrames for further processing
+✔️ Logs detailed runtime information for monitoring and debugging
 
 ⚠️ This module is focused solely on *budget data retrieval*.  
 It does not perform downstream validation, transformation, or 
 data warehouse operations such as BigQuery ingestion.
 ==================================================================
 """
+
 # Add root directory to sys.path for absolute imports of internal modules
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
-# Add logging ultilities for integration
+# Add Python logging ultilties for integration
 import logging
 
 # Add Python Pandas libraries for integration
 import pandas as pd
 
-# Add Python "re" librarries for integration
-import re
+# Add Python time ultilities for integration
+import time
 
 # Add Google Authentication libraries for integration
 from google.auth import default
-from google.auth.exceptions import DefaultCredentialsError
 from google.auth.transport.requests import AuthorizedSession
 
 # Add Google Spreadsheets API libraries for integration
 import gspread
-from gspread.exceptions import SpreadsheetNotFound, WorksheetNotFound, APIError, GSpreadException
 
 # Add internal Budget module for handling
-from src.schema import ensure_table_schema
+from src.schema import enforce_table_schema
 
 # Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
@@ -67,114 +67,123 @@ LAYER = os.getenv("LAYER")
 # Get environment variable for Mode
 MODE = os.getenv("MODE")
 
-# 1. FETCH BUDGET SHEETS FOR FACT TABLES
+# 1. FETCH BUDGET ALLCATION
 
-# 1.1. Fetch all valid worksheets excluding filters
-def fetch_budget_allocation(sheet_id: str, worksheet_name: str | None = None) -> pd.DataFrame:
-    print(f"🚀 [FETCH] Fetching budget allocation from {worksheet_name} sheet in {sheet_id} file...")
-    logging.info(f"🚀 [FETCH] Fetching budget allocation from {worksheet_name} sheet in {sheet_id} file...")
+# 1.1. Fetch Budget Allcation from Google Sheets
+def fetch_budget_allocation(sheet_id: str, worksheet_name: str) -> pd.DataFrame:
+    print(f"🚀 [FETCH] Starting to fetch budget allocation from {worksheet_name} worksheet in {sheet_id} Google Sheets sheet_id...")
+    logging.info(f"🚀 [FETCH] Starting to fetch budget allocation from {worksheet_name} worksheet in {sheet_id} Google Sheets sheet_id...")
 
-    # 1.1.1. Initialize Google Sheets client
+    # 1.1.1. Start timing the Budget Allocation fetching
+    fetch_time_start = time.time()   
+    fetch_sections_status = {}
+    fetch_sections_time = {}
+    print(f"🔍 [FETCH] Proceeding to fetch raw Budget Allocation at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    logging.info(f"🔍 [FETCH] Proceeding to fetch raw Budget Allocation at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+
     try:
-        print(f"🔍 [FETCH] Initializing Google Sheets client for sheet_id {sheet_id}...")
-        logging.info(f"🔍 [FETCH] Initializing Google Sheets client for sheet_id {sheet_id}...")                
-        scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-        creds, _ = default(scopes=scopes)
-        google_gspread_client = gspread.Client(auth=creds)
-        google_gspread_client.session = AuthorizedSession(creds)
-        print(f"✅ [FETCH] Successfully initialized Google Sheets client for sheet_id {sheet_id} with scopes {scopes}.")
-        logging.info(f"✅ [FETCH] Successfully initialized Google Sheets client for sheet_id {sheet_id} with scopes {scopes}.")
-    except DefaultCredentialsError as e:
-        raise RuntimeError("❌ [FETCH] Failed to initialize Google Sheets client due to credentials error.") from e
-    except SpreadsheetNotFound as e:
-        raise RuntimeError(f"❌ [FETCH] Failed to initialize Google Sheets client because spreadsheet {sheet_id} not found.") from e
-    except WorksheetNotFound as e:
-        raise RuntimeError(f"❌ [FETCH] Failed to initialize Google Sheets client because worksheet not found in spreadsheet {sheet_id}.") from e
-    except APIError as e:
-        raise RuntimeError("❌ [FETCH] Failed to initialize Google Sheets client due to API error.") from e
-    except GSpreadException as e:
-        raise RuntimeError("❌ [FETCH] Failed to initialize Google Sheets client due to Gspread client error.") from e
-    except Exception as e:
-        raise RuntimeError(f"❌ [FETCH] Failed to initialize Google Sheets client due to {e}.") from e 
+
+    # 1.1.2. Initialize Google Sheets client
+        fetch_section_name = "[FETCH] Initialize Google Sheets client"
+        fetch_section_start = time.time()            
+        try:
+            print(f"🔍 [FETCH] Initializing Google Sheets client for sheet_id {sheet_id}...")
+            logging.info(f"🔍 [FETCH] Initializing Google Sheets client for sheet_id {sheet_id}...")                
+            scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+            creds, _ = default(scopes=scopes)
+            google_gspread_client = gspread.Client(auth=creds)
+            google_gspread_client.session = AuthorizedSession(creds)
+            print(f"✅ [FETCH] Successfully initialized Google Sheets client for sheet_id {sheet_id} with scopes {scopes}.")
+            logging.info(f"✅ [FETCH] Successfully initialized Google Sheets client for sheet_id {sheet_id} with scopes {scopes}.")
+            fetch_sections_status[fetch_section_name] = "succeed"
+        except Exception as e:
+            fetch_sections_status[fetch_section_name] = "failed"
+            print(f"❌ [FETCH] Failed to initialize Google Sheets client due to {e}.")
+            logging.error(f"❌ [FETCH] Failed to initialize Google Sheets client due to {e}.")
+        finally:
+            fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2) 
     
-    # 1.1.2. Call Google Sheets API
-    try:
-        print(f"🔍 [FETCH] Retrieving {worksheet_name} in Google Sheets file {sheet_id} from Google Sheets API...")
-        logging.info(f"🔍 [FETCH] Retrieving {worksheet_name} in Google Sheets file {sheet_id} from Google Sheets API...")
-        ws = google_gspread_client.open_by_key(sheet_id).worksheet(worksheet_name)
-        records = ws.get_all_records()
-        print(f"✅ [FETCH] Retrieved {len(records)} row(s) from {worksheet_name} in Google Sheets file {sheet_id}.")
-        logging.info(f"✅ [FETCH] Retrieved {len(records)} row(s) from worksheet {worksheet_name} in Google Sheets file {sheet_id}.")
-        if not records:
-            print(f"⚠️ [FETCH] No data found in {worksheet_name} worksheet.")
-            logging.warning(f"⚠️ [FETCH] No data found in {worksheet_name} worksheet.")
-            return pd.DataFrame()
-        df = pd.DataFrame(records).replace("", None)
-    except Exception as e:
-        print(f"❌ [FETCH] Failed to fetch data from {worksheet_name} worksheet in {sheet_id} file due to {e}.")
-        logging.error(f"❌ [FETCH] Failed to fetch data from {worksheet_name} worksheet in {sheet_id} file due to {e}.")
-        return pd.DataFrame()
+    # 1.1.3. Make Google Sheets API call for worksheet recording
+        fetch_section_name = "[FETCH] Make Google Sheets API call for worksheet recording"
+        fetch_section_start = time.time()             
+        try:
+            print(f"🔍 [FETCH] Retrieving {worksheet_name} in Google Sheets file {sheet_id} from Google Sheets API...")
+            logging.info(f"🔍 [FETCH] Retrieving {worksheet_name} in Google Sheets file {sheet_id} from Google Sheets API...")
+            fetch_worksheet_budget = google_gspread_client.open_by_key(sheet_id).worksheet(worksheet_name)
+            fetch_records_responsed = fetch_worksheet_budget.get_all_records()
+            print(f"✅ [FETCH] Successfully retrieved {len(fetch_records_responsed)} row(s) from {worksheet_name} in Google Sheets file {sheet_id}.")
+            logging.info(f"✅ [FETCH] Successfully retrieved {len(fetch_records_responsed)} row(s) from {worksheet_name} in Google Sheets file {sheet_id}.")
+            if not fetch_records_responsed:
+                print(f"⚠️ [FETCH] No data found in {worksheet_name} worksheet then empty DataFrame will be returned.")
+                logging.warning(f"⚠️ [FETCH] No data found in {worksheet_name} worksheet then empty DataFrame will be returned.")
+                return pd.DataFrame()
+            fetch_df_flattened = pd.DataFrame(fetch_records_responsed).replace("", None)
+            fetch_sections_status[fetch_section_name] = "succeed"
+        except Exception as e:
+            fetch_sections_status[fetch_section_name] = "failed"
+            print(f"❌ [FETCH] Failed to retrieve worksheet record(s) from Google Sheets API due to {e}.")
+            logging.error(f"❌ [FETCH] Failed to retrieve worksheet record(s) from Google Sheets API due to {e}.")
+        finally:
+            fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)
+   
+    # 1.1.4. Trigger to enforce schema for Budget Allocation
+        fetch_section_name = "[FETCH] Trigger to enforce schema for Budget Allocation"
+        fetch_section_start = time.time()              
+        try:            
+            print(f"🔄 [FETCH] Trigger to enforce schema for Budget Allocation with {len(fetch_df_flattened)} row(s)...")
+            logging.info(f"🔄 [FETCH] Trigger to enforce schema for Budget Allocation with {len(fetch_df_flattened)} row(s)...")
+            fetch_results_schema = enforce_table_schema(fetch_df_flattened, "fetch_budget_allocation")
+            fetch_summary_enforced = fetch_results_schema["schema_summary_final"]
+            fetch_status_enforced = fetch_results_schema["schema_status_final"]
+            fetch_df_enforced = fetch_results_schema["schema_df_final"]    
+            if fetch_status_enforced == "schema_succeed_all":
+                print(f"✅ [FETCH] Successfully triggered to enforce schema for Budget Allocation with {fetch_summary_enforced['schema_rows_output']} row(s) in {fetch_summary_enforced['schema_time_elapsed']}s.")
+                logging.info(f"✅ [FETCH] Successfully triggered to enforce schema for Budget Allocation with {fetch_summary_enforced['schema_rows_output']} row(s) in {fetch_summary_enforced['schema_time_elapsed']}s.")
+                fetch_sections_status[fetch_section_name] = "succeed"
+            else:
+                fetch_sections_status[fetch_section_name] = "failed"
+                print(f"❌ [FETCH] Failed to retrieve schema enforcement final results(s) for Budget Allocation with failed sections "f"{', '.join(fetch_summary_enforced['schema_sections_failed'])}.")
+                logging.error(f"❌ [FETCH] Failed to retrieve schema enforcement final results(s) for Budget Allocation with failed sections "f"{', '.join(fetch_summary_enforced['schema_sections_failed'])}.")
+        finally:
+            fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)
 
-    # 1.1.3. Normalize column names to snake_case
-    try:
-        print(f"🔄 [FETCH] Normalizing name for {len(df.columns)} column(s) in budget allocation...")
-        logging.info(f"🔄 [FETCH] Normalizing name for {len(df.columns)} column(s) in budget allocation...")
-        df.columns = [
-            re.sub(r'(?<!^)(?=[A-Z])', '_', col.strip()).replace(" ", "_").lower()
-            for col in df.columns
-        ]
-        print(f"✅ [FETCH] Successfully normalized name for {len(df.columns)} column(s) in budget allocation.")
-        logging.info(f"✅ [FETCH] Successfully normalized name for {len(df.columns)} column(s) in budget allocation.")
-        if df.empty:
-            print("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then normalization is skipped.")
-            logging.warning("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then normalization is skipped.")   
-    except Exception as e:
-        print(f"❌ [FETCH] Failed to normalize column name(s) from budget allocation due to {e}.")
-        logging.error(f"❌ [FETCH] Failed to normalize column name(s) from budget allocation due to {e}.")
-
-    # 1.1.4. Remove unicode accent(s)
-    try:
-        print(f"🔄 [FETCH] Removing unicode accent(s) for {len(df.columns)} column name(s) in budget allocation...")
-        logging.info(f"🔄 [FETCH] Removing unicode accent(s) for {len(df.columns)} column name(s) in budget allocation...")
-        vietnamese_map = {
-            'á': 'a', 'à': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
-            'ă': 'a', 'ắ': 'a', 'ằ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
-            'â': 'a', 'ấ': 'a', 'ầ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
-            'đ': 'd',
-            'é': 'e', 'è': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
-            'ê': 'e', 'ế': 'e', 'ề': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
-            'í': 'i', 'ì': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
-            'ó': 'o', 'ò': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
-            'ô': 'o', 'ố': 'o', 'ồ': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
-            'ơ': 'o', 'ớ': 'o', 'ờ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
-            'ú': 'u', 'ù': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
-            'ư': 'u', 'ứ': 'u', 'ừ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
-            'ý': 'y', 'ỳ': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+    # 1.1.5. Summarize fetch result(s) for Budget Allocation
+    finally:
+        fetch_time_elapsed = round(time.time() - fetch_time_start, 2)
+        fetch_df_final = fetch_df_enforced.copy() if "fetch_df_enforced" in locals() and not fetch_df_enforced.empty else pd.DataFrame()
+        fetch_sections_total = len(fetch_sections_status) 
+        fetch_sections_failed = [k for k, v in fetch_sections_status.items() if v == "failed"] 
+        fetch_sections_succeeded = [k for k, v in fetch_sections_status.items() if v == "succeed"]
+        fetch_rows_output = len(fetch_df_final)
+        fetch_sections_summary = list(dict.fromkeys(
+            list(fetch_sections_status.keys()) +
+            list(fetch_sections_time.keys())
+        ))
+        fetch_sections_detail = {
+            fetch_section_summary: {
+                "status": fetch_sections_status.get(fetch_section_summary, "unknown"),
+                "time": fetch_sections_time.get(fetch_section_summary, None),
+            }
+            for fetch_section_summary in fetch_sections_summary
+        }          
+        if fetch_sections_failed:
+            print(f"❌ [FETCH] Failed to complete Budget Allocation fetching with {fetch_rows_output} fetched row(s) due to  {', '.join(fetch_sections_failed)} failed section(s) in {fetch_time_elapsed}s.")
+            logging.error(f"❌ [FETCH] Failed to complete Budget Allocation fetching with {fetch_rows_output} fetched row(s) due to  {', '.join(fetch_sections_failed)} failed section(s) in {fetch_time_elapsed}s.")
+            fetch_status_final = "fetch_failed_all"
+        else:
+            print(f"🏆 [FETCH] Successfully completed Budget Allocation fetching with {fetch_rows_output} fetched row(s) in {fetch_time_elapsed}s.")
+            logging.info(f"🏆 [FETCH] Successfully completed Budget Allocation fetching with {fetch_rows_output} fetched row(s) in {fetch_time_elapsed}s.")
+            fetch_status_final = "fetch_succeed_all"    
+        fetch_results_final = {
+            "fetch_df_final": fetch_df_final,
+            "fetch_status_final": fetch_status_final,
+            "fetch_summary_final": {
+                "fetch_time_elapsed": fetch_time_elapsed, 
+                "fetch_sections_total": fetch_sections_total,
+                "fetch_sections_succeed": fetch_sections_succeeded, 
+                "fetch_sections_failed": fetch_sections_failed, 
+                "fetch_sections_detail": fetch_sections_detail, 
+                "fetch_rows_output": fetch_rows_output
+            },
         }
-        vietnamese_map_upper = {k.upper(): v.upper() for k, v in vietnamese_map.items()}
-        full_map = {**vietnamese_map, **vietnamese_map_upper}
-        df.columns = [
-            ''.join(full_map.get(c, c) for c in col) if isinstance(col, str) else col
-            for col in df.columns
-        ]
-        print(f"✅ [FETCH] Successfully removed unicode accent(s) for {len(df.columns)} column name(s) in budget allocation.")
-        logging.info(f"✅ [FETCH] Successfully removed unicode accent(s) for {len(df.columns)} column name(s) in budget allocation.")
-        if df.empty:
-            print("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then unicode accent(s) removal is skipped.")
-            logging.warning("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then unicode accent(s) removal is skipped.")   
-    except Exception as e:
-        print(f"❌ [FETCH] Failed to remove unicode accent(s) from budget column name(s) due to {e}.")
-        logging.error(f"❌ [FETCH] Failed to remove unicode accent(s) from budget column name(s) due to {e}.")
-    
-    # 1.1.5. Enforce schema
-    try:
-        print(f"🔄 [FETCH] Triggering to enforce schema for {len(df)} row(s) of budget allocation...")
-        logging.info(f"🔄 [FETCH] Triggering to enforce schema for {len(df)} row(s) of budget allocation...")
-        df = ensure_table_schema(df, "fetch_budget_allocation")
-        if df.empty:
-            print("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then enforcement is skipped.")
-            logging.warning("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then enforcement is skipped.")                   
-    except Exception as e:
-        print(f"❌ [FETCH] Failed to enforce schema for budget allocation due to {e}.")
-        logging.error(f"❌ [FETCH] Failed to enforce schema for budget allocation due to {e}.")
-    return df
+    return fetch_results_final

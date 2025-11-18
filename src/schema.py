@@ -29,7 +29,7 @@ import numpy as np
 # 1. ENSURE SCHEMA FOR GIVEN PYTHON DATAFRAME IN BUDGET ALLOCAITON
 
 # 1.1. Ensure that the given DataFrame contains all required columns with correct datatypes for the specified schema type
-def ensure_table_schema(df: pd.DataFrame, schema_type: str) -> pd.DataFrame:
+def enforce_table_schema(df: pd.DataFrame, schema_type: str) -> pd.DataFrame:
     print(f"🔄 [SCHEMA] Enforce schema {schema_type} on Python DataFrame with {df.shape[1]} column(s)...")
     logging.info(f"🔄 [SCHEMA] Enforce schema {schema_type} on Python DataFrame with {df.shape[1]} column(s)...")
     

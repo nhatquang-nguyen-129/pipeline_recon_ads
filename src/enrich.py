@@ -65,9 +65,64 @@ LAYER = os.getenv("LAYER")
 # Get environment variable for Mode
 MODE = os.getenv("MODE")
 
+# 1. ENRRICH BUDGET ALLOCATION FROM INGESTION PHASE
+
+# 1.1. Enrich budget allocation from ingestion phase
+
+    # 1.1.4. Normalize column names to snake_case
+    try:
+        print(f"🔄 [FETCH] Normalizing name for {len(df.columns)} column(s) in budget allocation...")
+        logging.info(f"🔄 [FETCH] Normalizing name for {len(df.columns)} column(s) in budget allocation...")
+        df.columns = [
+            re.sub(r'(?<!^)(?=[A-Z])', '_', col.strip()).replace(" ", "_").lower()
+            for col in df.columns
+        ]
+        print(f"✅ [FETCH] Successfully normalized name for {len(df.columns)} column(s) in budget allocation.")
+        logging.info(f"✅ [FETCH] Successfully normalized name for {len(df.columns)} column(s) in budget allocation.")
+        if df.empty:
+            print("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then normalization is skipped.")
+            logging.warning("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then normalization is skipped.")   
+    except Exception as e:
+        print(f"❌ [FETCH] Failed to normalize column name(s) from budget allocation due to {e}.")
+        logging.error(f"❌ [FETCH] Failed to normalize column name(s) from budget allocation due to {e}.")
+
+    # 1.1.4. Remove unicode accent(s)
+    try:
+        print(f"🔄 [FETCH] Removing unicode accent(s) for {len(df.columns)} column name(s) in budget allocation...")
+        logging.info(f"🔄 [FETCH] Removing unicode accent(s) for {len(df.columns)} column name(s) in budget allocation...")
+        vietnamese_map = {
+            'á': 'a', 'à': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+            'ă': 'a', 'ắ': 'a', 'ằ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+            'â': 'a', 'ấ': 'a', 'ầ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+            'đ': 'd',
+            'é': 'e', 'è': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+            'ê': 'e', 'ế': 'e', 'ề': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+            'í': 'i', 'ì': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+            'ó': 'o', 'ò': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+            'ô': 'o', 'ố': 'o', 'ồ': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+            'ơ': 'o', 'ớ': 'o', 'ờ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+            'ú': 'u', 'ù': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+            'ư': 'u', 'ứ': 'u', 'ừ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+            'ý': 'y', 'ỳ': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+        }
+        vietnamese_map_upper = {k.upper(): v.upper() for k, v in vietnamese_map.items()}
+        full_map = {**vietnamese_map, **vietnamese_map_upper}
+        df.columns = [
+            ''.join(full_map.get(c, c) for c in col) if isinstance(col, str) else col
+            for col in df.columns
+        ]
+        print(f"✅ [FETCH] Successfully removed unicode accent(s) for {len(df.columns)} column name(s) in budget allocation.")
+        logging.info(f"✅ [FETCH] Successfully removed unicode accent(s) for {len(df.columns)} column name(s) in budget allocation.")
+        if df.empty:
+            print("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then unicode accent(s) removal is skipped.")
+            logging.warning("⚠️ [FETCH] Empty Python DataFrame returned from budget allocation then unicode accent(s) removal is skipped.")   
+    except Exception as e:
+        print(f"❌ [FETCH] Failed to remove unicode accent(s) from budget column name(s) due to {e}.")
+        logging.error(f"❌ [FETCH] Failed to remove unicode accent(s) from budget column name(s) due to {e}.")
+
 # 1. ENRICH BUDGET ALLOCATION FROM STAGING PHASE
 
-# 1.1. Enrich budget fields from staging phase
+# 1.1. Enrich budget allocation from staging phase
 def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) -> pd.DataFrame:
     print(f"🚀 [ENRICH] Starting to enrich staging Budget Allocation for {len(enrich_df_input)} row(s)...")
     logging.info(f"🚀 [ENRICH] Starting to enrich staging Budget Allocation for {len(enrich_df_input)} row(s)...")
