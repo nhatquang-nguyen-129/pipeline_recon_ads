@@ -247,7 +247,7 @@ def staging_budget_allocation() -> dict:
         finally:
             staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)        
 
-    # 1.1.8. Create new staging Budget Allocation table
+    # 1.1.9. Create new staging Budget Allocation table
         staging_section_name = "[STAGING] Create new staging Budget Allocation table"
         staging_section_start = time.time()     
         staging_df_deduplicated = staging_df_enforced.drop_duplicates()
@@ -288,20 +288,126 @@ def staging_budget_allocation() -> dict:
                 if table_clusters_filtered:  
                     table_configuration_defined.clustering_fields = table_clusters_filtered  
                 try:
-                    print(f"🔍 [STAGING] Creating staging Facebook Ads ad insights table with defined name {staging_table_ad} and partition on {table_partition_effective}...")
-                    logging.info(f"🔍 [STAGING] Creating staging Facebook Ads ad insights table with defined name {staging_table_ad} and partition on {table_partition_effective}...")
+                    print(f"🔍 [STAGING] Creating staging Budget Allocation table with defined name {staging_table_budget} and partition on {table_partition_effective}...")
+                    logging.info(f"🔍 [STAGING] Creating staging Budget Allocation table with defined name {staging_table_budget} and partition on {table_partition_effective}...")
                     table_metadata_defined = google_bigquery_client.create_table(table_configuration_defined)
-                    print(f"✅ [STAGING] Successfully created staging Facebook Ads ad insights table with actual name {table_metadata_defined.full_table_id}.")
-                    logging.info(f"✅ [STAGING] Successfully created staging Facebook Ads ad insights table with actual name {table_metadata_defined.full_table_id}.")
+                    print(f"✅ [STAGING] Successfully created staging Budget Allocation table with actual name {table_metadata_defined.full_table_id}.")
+                    logging.info(f"✅ [STAGING] Successfully created staging Budget Allocation table with actual name {table_metadata_defined.full_table_id}.")
                     staging_sections_status[staging_section_name] = "succeed"
                 except Exception as e:
                     staging_sections_status[staging_section_name] = "failed"
-                    print(f"❌ [STAGING] Failed to create staging Facebook Ads ad insights table {staging_table_ad} due to {e}.")
-                    logging.error(f"❌ [STAGING] Failed to create staging Facebook Ads ad insights table {staging_table_ad} due to {e}.")
-                    raise RuntimeError(f"❌ [STAGING] Failed to create staging Facebook Ads ad insights table {staging_table_ad} due to {e}.") from e
+                    print(f"❌ [STAGING] Failed to create staging Budget Allocation table {staging_table_budget} due to {e}.")
+                    logging.error(f"❌ [STAGING] Failed to create staging Budget Allocation table {staging_table_budget} due to {e}.")
+                    raise RuntimeError(f"❌ [STAGING] Failed to create staging Budget Allocation table {staging_table_budget} due to {e}.") from e
             else:
-                print(f"⚠️ [STAGING] Staging Facebook Ads ad insights table {staging_table_ad} already exists then creation will be skipped.")
-                logging.info(f"⚠️ [STAGING] Staging Facebook Ads ad insights table {staging_table_ad} already exists then creation will be skipped.")
+                print(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} already exists then creation will be skipped.")
+                logging.info(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} already exists then creation will be skipped.")
                 staging_sections_status[staging_section_name] = "succeed"
         finally:
             staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)
+
+    # 1.1.10. Upload staging Budget Allocation
+        staging_section_name = "[STAGING] Upload staging Budget Allocation"
+        staging_section_start = time.time()        
+        try:            
+            if not staging_table_exists:
+                try: 
+                    print(f"🔍 [STAGING] Uploading {len(staging_df_enforced)} row(s) of staging Budget Allocation to new Google BigQuery table {table_metadata_defined.full_table_id}...")
+                    logging.warning(f"🔍 [STAGING] Uploading {len(staging_df_enforced)} row(s) of staging Budget Allocation to new Google BigQuery table {table_metadata_defined.full_table_id}...")
+                    job_config = bigquery.LoadJobConfig(
+                        write_disposition="WRITE_APPEND",
+                        time_partitioning=bigquery.TimePartitioning(
+                            type_=bigquery.TimePartitioningType.DAY,
+                            field="date"
+                        ),
+                        clustering_fields=table_clusters_filtered if table_clusters_filtered else None
+                    )
+                    load_job = google_bigquery_client.load_table_from_dataframe(
+                        staging_df_enforced,
+                        staging_table_budget, 
+                        job_config=job_config
+                    )
+                    load_job.result()
+                    staging_df_uploaded = staging_df_enforced.copy()
+                    print(f"✅ [STAGING] Successfully uploaded {len(staging_df_uploaded)} row(s) of staging Budget Allocation to new Google BigQuery table {table_metadata_defined.full_table_id}.")
+                    logging.info(f"✅ [STAGING] Successfully uploaded {len(staging_df_uploaded)} row(s) of staging Budget Allocation to new Google BigQuery table {table_metadata_defined.full_table_id}.")
+                    staging_sections_status[staging_section_name] = "succeed"
+                except Exception as e:
+                    staging_sections_status[staging_section_name] = "failed"
+                    print(f"❌ [STAGING] Failed to upload {len(staging_df_enforced)} row(s) of staging Budget Allocation to Google BigQuery table {table_metadata_defined.full_table_id} due to {e}.")
+                    logging.error(f"❌ [STAGING] Failed to upload {len(staging_df_enforced)} row(s) of staging Budget Allocation to Google BigQuery table {table_metadata_defined.full_table_id} due to {e}.")
+                    raise RuntimeError(f"❌ [STAGING] Failed to upload {len(staging_df_enforced)} row(s) of staging Budget Allocation to Google BigQuery table {table_metadata_defined.full_table_id} due to {e}.") from e  
+            else:
+                try:
+                    print(f"🔍 [STAGING] Found existing Google BigQuery table {staging_table_budget} and {len(staging_df_enforced)} row(s) of staging Budget Allocation will be overwritten...")
+                    logging.warning(f"🔍 [STAGING] Found existing Google BigQuery table {staging_table_budget} and {len(staging_df_enforced)} row(s) of staging Budget Allocation will be overwritten...")
+                    job_config = bigquery.LoadJobConfig(
+                        write_disposition="WRITE_TRUNCATE",
+                    )
+                    load_job = google_bigquery_client.load_table_from_dataframe(
+                        staging_df_enforced,
+                        staging_table_budget, 
+                        job_config=job_config
+                    )
+                    load_job.result()
+                    staging_df_uploaded = staging_df_enforced.copy()
+                    print(f"✅ [STAGING] Successfully overwrote {len(staging_df_uploaded)} row(s) of staging Budget Allocation to existing Google BigQuery table {staging_table_budget}.")
+                    logging.info(f"✅ [STAGING] Successfully overwrote {len(staging_df_uploaded)} row(s) of staging Budget Allocation to existing Google BigQuery table {staging_table_budget}.")
+                    staging_sections_status[staging_section_name] = "succeed"
+                except Exception as e:
+                    staging_sections_status[staging_section_name] = "failed"
+                    print(f"❌ [STAGING] Failed to overwrite {len(staging_df_enforced)} row(s) of staging Budget Allocation to existing Google BigQuery table {staging_table_budget} due to {e}.")
+                    logging.error(f"❌ [STAGING] Failed to overwrite {len(staging_df_enforced)} row(s) of staging Budget Allocation to existing Google BigQuery table {staging_table_budget} due to {e}.")
+        finally:
+            staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)
+
+    # 1.1.11. Summarize staging result(s) of Budget Allocation
+    finally:
+        staging_time_elapsed = round(time.time() - staging_time_start, 2)
+        staging_df_final = staging_df_uploaded.copy() if not staging_df_uploaded.empty else pd.DataFrame()
+        staging_sections_total = len(staging_sections_status)
+        staging_sections_succeed = [k for k, v in staging_sections_status.items() if v == "succeed"]
+        staging_sections_failed = [k for k, v in staging_sections_status.items() if v == "failed"]
+        staging_tables_input = len(raw_tables_budget)
+        staging_tables_output = len(staging_tables_queried)
+        staging_tables_failed = staging_tables_input - staging_tables_output
+        staging_rows_output = len(staging_df_final)
+        staging_sections_summary = list(dict.fromkeys(
+            list(staging_sections_status.keys()) +
+            list(staging_sections_time.keys())
+        ))
+        staging_sections_detail = {
+            staging_section_summary: {
+                "status": staging_sections_status.get(staging_section_summary, "unknown"),
+                "time": round(staging_sections_time.get(staging_section_summary, 0.0), 2),
+            }
+            for staging_section_summary in staging_sections_summary
+        }     
+        if staging_sections_failed:
+            print(f"❌ [STAGING] Failed to complete Budget Allocation staging with {staging_tables_output}/{staging_tables_input} queried table(s) and {staging_rows_output} uploaded row(s) in {staging_time_elapsed}s.")
+            logging.error(f"❌ [STAGING] Failed to complete Budget Allocation staging with {staging_tables_output}/{staging_tables_input} queried table(s) and {staging_rows_output} uploaded row(s) in {staging_time_elapsed}s.")
+            staging_status_final = "staging_failed_all"
+        elif staging_tables_failed > 0:
+            print(f"⚠️ [STAGING] Partially completed Budget Allocation staging with {staging_tables_output}/{staging_tables_input} queried table(s) and {staging_rows_output} uploaded row(s) in {staging_time_elapsed}s.")
+            logging.warning(f"⚠️ [STAGING] Partially completed Budget Allocation staging with {staging_tables_output}/{staging_tables_input} queried table(s) and {staging_rows_output} uploaded row(s) in {staging_time_elapsed}s.")
+            staging_status_final = "staging_failed_partial"
+        else:
+            print(f"🏆 [STAGING] Successfully completed Budget Allocation staging with {staging_tables_output}/{staging_tables_input} queried table(s) and {staging_rows_output} uploaded row(s) in {staging_time_elapsed}s.")
+            logging.info(f"🏆 [STAGING] Successfully completed Budget Allocation staging with {staging_tables_output}/{staging_tables_input} queried table(s) and {staging_rows_output} uploaded row(s) in {staging_time_elapsed}s.")
+            staging_status_final = "staging_succeed_all"
+        staging_results_final = {
+            "staging_df_final": staging_df_final,
+            "staging_status_final": staging_status_final,
+            "staging_summary_final": {
+                "staging_time_elapsed": staging_time_elapsed,
+                "staging_sections_total": staging_sections_total,
+                "staging_sections_succeed": staging_sections_succeed,
+                "staging_sections_failed": staging_sections_failed,
+                "staging_sections_detail": staging_sections_detail,
+                "staging_tables_input": staging_tables_input,
+                "staging_tables_output": staging_tables_output,
+                "staging_tables_failed": staging_tables_failed,
+                "staging_rows_output": staging_rows_output,
+            }
+        }
+    return staging_results_final
