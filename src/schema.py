@@ -42,8 +42,8 @@ import numpy as np
 
 # 1.1. Enforce that the given DataFrame contains all required columns with correct datatypes
 def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str) -> pd.DataFrame:
-    print(f"🚀 [SCHEMA] Starting to enforce schema {schema_type_mapping} on Python DataFrame with {df.shape[1]} column(s)...")
-    logging.info(f"🚀 [SCHEMA] Starting to enforce schema {schema_type_mapping} on Python DataFrame with {df.shape[1]} column(s)...")
+    print(f"🚀 [SCHEMA] Starting to enforce schema {schema_type_mapping} on Python DataFrame with {schema_df_input.shape[1]} column(s)...")
+    logging.info(f"🚀 [SCHEMA] Starting to enforce schema {schema_type_mapping} on Python DataFrame with {schema_df_input.shape[1]} column(s)...")
     
     # 1.1.1. Start timing the raw Budget Allocation enrichment
     schema_time_start = time.time()
