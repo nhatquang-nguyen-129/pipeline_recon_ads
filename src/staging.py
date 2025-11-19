@@ -2,44 +2,45 @@
 ==================================================================
 BUDGET STAGING MODULE
 ------------------------------------------------------------------
-This module ingests budget allocation data from Google Sheets into 
-Google BigQuery, forming the raw data layer of the marketing pipeline.
+This module transforms raw Budget Allocation data into enriched,  
+normalized staging tables in BigQuery, acting as the bridge  
+between raw API ingestion and final MART-level analytics.
 
-It reads structured budget data from predefined worksheets, performs 
-basic cleaning (e.g. normalizing column names, coercing numeric fields), 
-and loads them into partitioned BigQuery tables per sheet/month.
+It combines track/program/type data, applies business logic  
+(e.g., parsing naming conventions, standardizing fields), and  
+prepares clean, query-ready datasets for downstream consumption.
 
-✔️ Uses Google Sheets API via `gspread` with service account auth  
-✔️ Supports sheet filtering and naming normalization per config  
-✔️ Automatically writes to BigQuery with schema autodetect (WRITE_TRUNCATE)
+✔️ Joins raw budget allocation with track and program data
+✔️ Enriches fields such as owner, placement and format  
+✔️ Normalizes and writes standardized tables into dataset  
+✔️ Validates data integrity and ensures field completeness  
+✔️ Supports modular extension for new Budget Allocation entities  
 
-⚠️ This module is strictly limited to *raw-layer ingestion*.  
-It does **not** handle staging, aggregation, or mart-level logic.
+⚠️ This module is strictly responsible for data transformation
+into staging format. It does not handle API ingestion or final  
+materialized aggregations.
 ==================================================================
 """
+
 # Add root directory to sys.path for absolute imports of internal modules
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
-# Add logging ultilities for integration
+# Add Python logging ultilities for integration
 import logging
+
+# Add Python time ultilities for integration
+import time
 
 # Add Python Pandas libraries for integration
 import pandas as pd
 
-# Add Python "re" libraríe for integration
-import re
-
-# Add Google Authentication libraries for integration
-from google.auth.exceptions import DefaultCredentialsError
-from google.api_core.exceptions import Forbidden, GoogleAPICallError
-
-# Add Google BigQuery library for integration
+# Add Google Cloud modules for integration
 from google.cloud import bigquery
 
 # Add internal Budget module for handling
-from src.schema import ensure_table_schema
+from src.schema import enforce_table_schema
 from src.enrich import enrich_budget_fields
 
 # Get environment variable for Company
@@ -63,155 +64,244 @@ LAYER = os.getenv("LAYER")
 # Get environment variable for Mode
 MODE = os.getenv("MODE")
 
-# 1. TRANSFORM BUDGET RAW DATA INTO CLEANED STAGING TABLES FOR MODELING AND ANALYSIS
+# 1. TRANSFORM BUDGET ALLOCATION RAW DATA INTO CLEANED STAGING TABLES
 
-# 1.1. TRANSFORM BUDGET RAW DATA INTO STAGNG TABLE WIH TIME PARTITIONING
-def staging_budget_allocation():
-    print("🚀 [STAGING] Starting unified staging process for all budget raw tables...")
-    logging.info("🚀 [STAGING] Starting unified staging process for all budget raw tables...")
+# 1.1. Transform Budget Allocation from raw tables into cleaned staging tables
+def staging_budget_allocation() -> dict:
+    print("🚀 [STAGING] Starting to build staging Budget Allocation table...")
+    logging.info("🚀 [STAGING] Starting to build staging Budget Allocation table...")
+    
+    # 1.1.1. Start timing the Budget Allocation staging
+    raw_tables_budget = []
+    staging_time_start = time.time()
+    staging_tables_queried = []
+    staging_df_concatenated = pd.DataFrame()
+    staging_df_uploaded = pd.DataFrame()    
+    staging_sections_status = {}
+    staging_sections_time = {}
+    print(f"🔍 [STAGING] Proceeding to transform Budget Allocation into cleaned staging table at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    logging.info(f"🔍 [STAGING] Proceeding to transform Budget Allocation into cleaned staging table at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
 
     try:
     
-    # 1.1.1. Initialize Google BigQuery client
+    # 1.1.2. Prepare table_id for Budget Allocation staging
+        staging_section_name = "[STAGING] Prepare table_id for Budget Allocation staging"
+        staging_section_start = time.time()   
+        try:            
+            raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"
+            print(f"🔍 [STAGING] Using raw dataset {raw_dataset} to build staging table for Budget Allocation...")
+            logging.info(f"🔍 [STAGING] Using raw dataset {raw_dataset} to build staging table for Budget Allocation...")
+            staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_staging"
+            staging_table_budget = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
+            print(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for Budget Allocation...")
+            logging.info(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for Budget Allocation...")
+            staging_sections_status[staging_section_name] = "succeed"
+        finally:
+            staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)            
+
+    # 1.1.3. Initialize Google BigQuery client
+        staging_section_name = "[STAGING] Initialize Google BigQuery client"
+        staging_section_start = time.time()    
         try:
             print(f"🔍 [STAGING] Initializing Google BigQuery client for Google Cloud Platform project {PROJECT}...")
             logging.info(f"🔍 [STAGING] Initializing Google BigQuery client for Google Cloud Platform project {PROJECT}...")
             google_bigquery_client = bigquery.Client(project=PROJECT)
             print(f"✅ [STAGING] Successfully initialized Google BigQuery client for Google Cloud Platform project {PROJECT}.")
             logging.info(f"✅ [STAGING] Successfully initialized Google BigQuery client for Google Cloud Platform project {PROJECT}.")
-        except DefaultCredentialsError as e:
-            raise RuntimeError("❌ [STAGING] Failed to initialize Google BigQuery client due to credentials error.") from e
-        except Forbidden as e:
-            raise RuntimeError("❌ [STAGING] Failed to initialize Google BigQuery client due to permission denial.") from e
-        except GoogleAPICallError as e:
-            raise RuntimeError("❌ [STAGING] Failed to initialize Google BigQuery client due to API call error.") from e
+            staging_sections_status[staging_section_name] = "succeed"
         except Exception as e:
-            raise RuntimeError(f"❌ [STAGING] Failed to initialize Google BigQuery client due to {e}.") from e
+            staging_sections_status[staging_section_name] = "failed"
+            print(f"❌ [STAGING] Failed to initialize Google BigQuery client for Google Cloud Platform project {PROJECT} due to {e}.")
+            logging.error(f"❌ [STAGING] Failed to initialize Google BigQuery client for Google Cloud Platform project {PROJECT} due to {e}.")
+        finally:
+            staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)
 
-    # 1.1.2. Prepare id        
-        raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"
-        print(f"🔍 [STAGING] Using raw dataset {raw_dataset} to build staging table for budget allocation...")
-        logging.info(f"🔍 [STAGING] Using raw dataset {raw_dataset} to build staging table for budget allocation...")
-        staging_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_staging"
-        staging_table_budget = f"{PROJECT}.{staging_dataset}.{COMPANY}_table_{PLATFORM}_all_all_allocation_monthly"
-        print(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for budget allocation...")
-        logging.info(f"🔍 [STAGING] Using staging dataset {raw_dataset} to build staging table for budget allocation...")
-
-    # 1.1.3. Scan all raw budget allocation table(s)
-        print("🔍 [STAGING] Scanning all raw budget allocation table(s)...")
-        logging.info("🔍 [STAGING] Scanning all raw budget allocation table(s)...")
-        tables = google_bigquery_client.list_tables(f"{PROJECT}.{raw_dataset}")
-        raw_tables = [
-            table.table_id for table in tables 
-            if re.match(r"^.*_allocation_[a-zA-Z0-9_]+$", table.table_id)
-        ]
-        if not raw_tables:
-            print(f"⚠️ [STAGING] No raw budget allocation table(s) found for {COMPANY} company then staging is skipped.")
-            logging.warning(f"⚠️ [STAGING] No raw budget allocation table(s) found for {COMPANY} company then staging is skipped.")
-            return
-        print(f"✅ [STAGING] Successfully found {len(raw_tables)} raw budget table(s) for {COMPANY} company: {raw_tables}")
-        logging.info(f"✅ [STAGING] Successfully found {len(raw_tables)} raw budget table(s) for {COMPANY} company: {raw_tables}")
-
-    # 1.1.4. Query raw budget table(s)
-        all_dfs = []
-        for table in raw_tables:
-            raw_table = f"{PROJECT}.{raw_dataset}.{table}"
-            print(f"🔄 [STAGING] Querying raw budget allocation table {raw_table}...")
-            logging.info(f"🔄 [STAGING] Querying raw budget allocation table {raw_table}...")
-            try:
-                df_raw = google_bigquery_client.query(f"SELECT * FROM `{raw_table}`").to_dataframe()
-                if df_raw.empty:
-                    print(f"⚠️ [STAGING] Budget allocation table {table} is empty then query is skipped.")
-                    logging.warning(f"⚠️ [STAGING] Budget allocation table {table} is empty then query is skipped.")
-                    continue
-                # Enrich fields
-                print(f"🔄 [STAGING] Triggering to enrich staging budget allocation field(s) for {len(df_raw)} row(s) from {raw_table}...")
-                logging.info(f"🔄 [STAGING] Triggering to enrich staging budget allocation field(s) for {len(df_raw)} row(s) from {raw_table}...")
-                df_raw = enrich_budget_fields(df_raw, table_id=raw_table)
-                all_dfs.append(df_raw)
-                print(f"✅ [STAGING] Successfully enriched {len(df_raw)} row(s) from raw budget table {raw_table}.")
-                logging.info(f"✅ [STAGING] Successfully enriched {len(df_raw)} row(s) from raw budget table {raw_table}.")
-            except Exception as e:
-                print(f"❌ [STAGING] Failed to query raw budget allocation table {raw_table} due to {e}.")
-                logging.warning(f"❌ [STAGING] Failed to query raw budget allocation table {raw_table} due to {e}.")
-                continue
-        if not all_dfs:
-            print("⚠️ [STAGING] No data found in any raw budget allocation table(s).")
-            logging.warning("⚠️ [STAGING] No data found in any raw budget allocation table(s).")
-            return
-        df_all = pd.concat(all_dfs, ignore_index=True)
-        print(f"✅ [STAGING] Successfully combined {len(df_all)} row(s) from all budget raw tables.")
-        logging.info(f"✅ [STAGING] Successfully combined {len(df_all)} row(s) from all budget raw tables.")
-
-    # 1.1.5. Enrich budget allocation
+    # 1.1.4. Scan all raw budget allocation table(s)
+        staging_section_name = "[STAGING] can all raw budget allocation table(s)"
+        staging_section_start = time.time()            
         try:
-            print(f"🔄 [STAGING] Enriching fields for {len(df_all)} row(s) of staging budget allocation field(s)...")
-            logging.info(f"🔄 [STAGING] Enriching fields for {len(df_all)} row(s) of staging budget allocation field(s)...")
-            for col in ["ngan_sach_ban_dau", "ngan_sach_dieu_chinh", "ngan_sach_bo_sung"]:
-                if col in df_all.columns:
-                    df_all[col] = pd.to_numeric(df_all[col], errors="coerce").fillna(0).astype(int)
-                else:
-                    df_all[col] = 0
-            df_all["ngan_sach_thuc_chi"] = df_all["ngan_sach_ban_dau"] + df_all["ngan_sach_dieu_chinh"] + df_all["ngan_sach_bo_sung"]
-            df_all["thoi_gian_bat_dau"] = pd.to_datetime(df_all.get("thoi_gian_bat_dau"), errors="coerce")
-            df_all["thoi_gian_ket_thuc"] = pd.to_datetime(df_all.get("thoi_gian_ket_thuc"), errors="coerce")
-            today = pd.to_datetime("today").normalize()
-            df_all["tong_so_ngay_thuc_chay"] = (df_all["thoi_gian_ket_thuc"] - df_all["thoi_gian_bat_dau"]).dt.days
-            df_all["tong_so_ngay_da_qua"] = ((today - df_all["thoi_gian_bat_dau"]).dt.days.clip(lower=0))
-            df_all["ngan_sach_he_thong"] = (df_all["ma_ngan_sach_cap_1"] == "KP") * df_all["ngan_sach_thuc_chi"]
-            df_all["ngan_sach_nha_cung_cap"] = (df_all["ma_ngan_sach_cap_1"] == "NC") * df_all["ngan_sach_thuc_chi"]
-            df_all["ngan_sach_kinh_doanh"] = (df_all["ma_ngan_sach_cap_1"] == "KD") * df_all["ngan_sach_thuc_chi"]
-            df_all["ngan_sach_tien_san"] = (df_all["ma_ngan_sach_cap_1"] == "CS") * df_all["ngan_sach_thuc_chi"]
-            df_all["ngan_sach_tuyen_dung"] = (df_all["ma_ngan_sach_cap_1"] == "HC") * df_all["ngan_sach_thuc_chi"]
-            df_all["ngan_sach_khac"] = df_all["ngan_sach_tien_san"] + df_all["ngan_sach_tuyen_dung"]
-            df_all = ensure_table_schema(df_all, "staging_budget_allocation")
-            print(f"✅ [STAGING] Successfully enriched {len(df_all)} row(s) of staging budget allocation.")
-            logging.info(f"✅ [STAGING] Successfully enriched {len(df_all)} row(s) of staging budget allocation.")  
-        except Exception as e:
-            print(f"❌ [STAGING] Failed to enrich staging budget allocation due to {e}.")
-            logging.error(f"❌ [STAGING] Failed to enrich staging budget allocation due to {e}.")
-            raise
-
-    # 1.1.6. Enforce schema for Facebook staging campaign insights
-        try:
-            print(f"🔄 [STAGING] Enforcing schema for {len(df_all)} row(s) of staging budget allocation...")
-            logging.info(f"🔄 [STAGING] Enforcing schema for {len(df_all)} row(s) of staging budget allocation...")
-            df_all = ensure_table_schema(df_all, "staging_budget_allocation")
-            print(f"✅ [STAGING] Successfully enforced {len(df_all)} row(s) of staging budget allocation.")
-            logging.info(f"✅ [STAGING] Successfully enforced {len(df_all)} row(s) of Ftaging budget allocation.")
-        except Exception as e:
-            print(f"❌ [STAGING] Failed to enforce schema for {len(df_all)} row(s) of staging budget allocation due to {e}.")
-            logging.error(f"❌ [STAGING] Failed to enforce schema for {len(df_all)} row(s) of staging budget allocation due to {e}.")
-            raise        
-
-    # 1.1.7. Upload Facebook staging campaign insights to Google BigQuery raw table        
-        try:
-            print(f"🔍 [STAGING] Uploading {len(df_all)} row(s) of staging budget allocation table {staging_table_budget}...")
-            logging.info(f"🔍 [STAGING] Uploading {len(df_all)} row(s) of staging budget allocation table {staging_table_budget}...")
-            if "special_event_name" in df_all.columns:
-                df_all["special_event_name"] = df_all["special_event_name"].where(
-                    pd.notnull(df_all["special_event_name"]), None
+            print(f"🔍 [STAGING] Scanning all raw Budget Allocation table(s) from Google BigQuery dataset {raw_dataset}...")
+            logging.info(f"🔍 [STAGING] Scanning all raw Budget Allocation table(s) from Google BigQuery dataset {raw_dataset}...")
+            query_budget_raw = f"""
+                SELECT table_name
+                FROM `{PROJECT}.{raw_dataset}.INFORMATION_SCHEMA.TABLES`
+                WHERE REGEXP_CONTAINS(
+                    table_name,
+                    r'^{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_m[0-1][0-9][0-9]{{4}}$'
                 )
-            clustering_fields = [
-                f for f in ["ma_ngan_sach_cap_1", "chuong_trinh", "thang", "nen_tang"]
-                if f in df_all.columns
-            ]
-            job_config = bigquery.LoadJobConfig(
-                write_disposition="WRITE_TRUNCATE",
-                source_format=bigquery.SourceFormat.PARQUET,
-                clustering_fields=clustering_fields if clustering_fields else None
-            )
-            load_job = google_bigquery_client.load_table_from_dataframe(
-                df_all,
-                staging_table_budget,
-                job_config=job_config
-            )
-            load_job.result()
-            print(f"✅ [STAGING] Successfully uploaded {len(df_all)} row(s) of staging budget allocation to table {staging_table_budget}.")
-            logging.info(f"✅ [STAGING] Successfully uploaded {len(df_all)} row(s) of staging budget allocation to table {staging_table_budget}.")
+            """   
+            raw_tables_budget = [row.table_name for row in google_bigquery_client.query(query_budget_raw).result()]
+            raw_tables_budget = [f"{PROJECT}.{raw_dataset}.{t}" for t in raw_tables_budget]
+            if not raw_tables_budget:
+                raise RuntimeError("❌ [STAGING] Failed to scan raw Budget Allocation table(s) due to no tables found.")
+            print(f"✅ [STAGING] Successfully found {len(raw_tables_budget)} raw Budget Allocation table(s).")
+            logging.info(f"✅ [STAGING] Successfully found {len(raw_tables_budget)} raw Budget Allocation table(s).")
+            staging_sections_status[staging_section_name] = "succeed"
         except Exception as e:
-            print(f"❌ [STAGING] Failed to upload staging budget allocation due to {e}.")
-            logging.error(f"❌ [STAGING] Failed to upload staging budget allocation due to {e}.")
-    except Exception as e:
-        print(f"❌ [STAGING] Faild to unify staging budget allocation due to {e}.")
-        logging.error(f"❌ [STAGING] Faild to unify staging budget allocation due to {e}.")
+            staging_sections_status[staging_section_name] = "failed"
+            print(f"❌ [STAGING] Failed to scan raw TikTok Ads campaign insights table(s) due to {e}.")
+            logging.error(f"❌ [STAGING] Failed to scan raw TikTok Ads campaign insights table(s) due to {e}.")
+        finally:
+            staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)    
+
+    # 1.1.5. Query all raw Budget Allocation table(s)
+        staging_section_name = "[STAGING] Query all raw Budget Allocation table(s)"
+        staging_section_start = time.time()
+        try:
+            for raw_table_budget in raw_tables_budget:
+                query_budget_staging = f"""
+                    SELECT *
+                    FROM `{raw_table_budget}`
+                """
+                try:
+                    print(f"🔄 [STAGING] Querying raw Budget Allocation table {raw_table_budget}...")
+                    logging.info(f"🔄 [STAGING] Querying raw Budget Allocation table {raw_table_budget}...")
+
+                    staging_df_queried = google_bigquery_client.query(query_budget_staging).to_dataframe()
+                    staging_tables_queried.append({
+                        "raw_table_budget": raw_table_budget,
+                        "staging_df_queried": staging_df_queried
+                    })
+                    print(f"✅ [STAGING] Successfully queried {len(staging_df_queried)} row(s) from raw Budget Allocation table {raw_table_budget}.")
+                    logging.info(f"✅ [STAGING] Successfully queried {len(staging_df_queried)} row(s) from raw Budget Allocation table {raw_table_budget}.")
+                except Exception as e:
+                    print(f"❌ [STAGING] Failed to query raw Budget Allocation table {raw_table_budget} due to {e}.")
+                    logging.warning(f"❌ [STAGING] Failed to query raw Budget Allocation table {raw_table_budget} due to {e}.")
+                    continue
+        finally:
+            staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)
+
+        if len(staging_tables_queried) == len(raw_tables_budget):
+            staging_sections_status[staging_section_name] = "succeed"
+        elif len(staging_tables_queried) > 0:
+            staging_sections_status[staging_section_name] = "partial"
+        else:
+            staging_sections_status[staging_section_name] = "failed"
+
+    # 1.1.6. Trigger to enrich staging Budget Allocation
+        staging_section_name = "[STAGING] Trigger to enrich staging Budget Allocation"
+        staging_section_start = time.time()         
+        staging_tables_enriched = []
+        staging_dfs_enriched = []  
+        try:
+            for staging_table_queried in staging_tables_queried:
+                raw_table_budget = staging_table_queried["raw_table_budget"]
+                staging_df_queried = staging_table_queried["staging_df_queried"]
+                print(f"🔄 [STAGING] Trigger to enrich staging Budget Allocation for {len(staging_df_queried)} queried row(s) from Google BigQuery table {raw_table_budget}...")
+                logging.info(f"🔄 [STAGING] Trigger to enrich staging Budget Allocation for {len(staging_df_queried)} queried row(s) from Google BigQuery table {raw_table_budget}...")
+                staging_results_enriched = enrich_budget_fields(staging_df_queried, enrich_table_id=raw_table_budget)
+                staging_df_enriched = staging_results_enriched["enrich_df_final"]
+                staging_status_enriched = staging_results_enriched["enrich_status_final"]
+                staging_summary_enriched = staging_results_enriched["enrich_summary_final"]
+                if staging_status_enriched == "enrich_succeed_all":
+                    print(f"✅ [STAGING] Successfully triggered staging Budget Allocation enrichment with {staging_summary_enriched['enrich_rows_output']}/{staging_summary_enriched['enrich_rows_input']} enriched row(s) in {staging_summary_enriched['enrich_time_elapsed']}s.")
+                    logging.info(f"✅ [STAGING] Successfully triggered staging Budget Allocation enrichment with {staging_summary_enriched['enrich_rows_output']}/{staging_summary_enriched['enrich_rows_input']} enriched row(s) in {staging_summary_enriched['enrich_time_elapsed']}s.")
+                    staging_tables_enriched.append(raw_table_budget)
+                    staging_dfs_enriched.append(staging_df_enriched)
+                else:
+                    print(f"❌ [STAGING] Failed to trigger staging Budget Allocation enrichment with {staging_summary_enriched['enrich_rows_output']}/{staging_summary_enriched['enrich_rows_input']} enriched row(s) due to section(s) {', '.join(staging_summary_enriched.get('enrich_sections_failed', []))} in {staging_summary_enriched['enrich_time_elapsed']}s.")
+                    logging.error(f"❌ [STAGING] Failed to trigger staging Budget Allocation enrichment with {staging_summary_enriched['enrich_rows_output']}/{staging_summary_enriched['enrich_rows_input']} enriched row(s) due to section(s) {', '.join(staging_summary_enriched.get('enrich_sections_failed', []))} in {staging_summary_enriched['enrich_time_elapsed']}s.")
+        finally:
+            staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)                        
+        if len(staging_tables_enriched) == len(staging_tables_queried):
+            staging_sections_status[staging_section_name] = "succeed"
+        elif len(staging_tables_enriched) > 0:
+            staging_sections_status[staging_section_name] = "partial"
+        else:
+            staging_sections_status[staging_section_name] = "failed"
+
+    # 1.1.7. Concatenate enriched staging Budget Allocation
+        staging_section_name = "[STAGING] Concatenate enriched staging Budget Allocation"
+        staging_section_start = time.time()
+        try:        
+            if staging_dfs_enriched:
+                staging_df_concatenated = pd.concat(staging_dfs_enriched, ignore_index=True)
+                print(f"✅ [STAGING] Successully concatenated staging Budget Allocation with {len(staging_df_concatenated)} enriched row(s) from {len(staging_dfs_enriched)} DataFrame(s).")
+                logging.info(f"✅ [STAGING] Successully concatenated staging Budget Allocation with {len(staging_df_concatenated)} enriched row(s) from {len(staging_dfs_enriched)} DataFrame(s).")
+                staging_sections_status[staging_section_name] = "succeed"
+            else:
+                print("⚠️ [STAGING] No enriched DataFrame found for staging Budget Allocation then concatenation is failed.")
+                logging.warning("⚠️ [STAGING] No enriched DataFrame found for staging Budget Allocation then concatenation is failed.")
+                staging_sections_status[staging_section_name] = "failed"
+        finally:
+            staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)     
+
+    # 1.1.8. Trigger to enforce schema for staging Budget Allocation
+        staging_section_name = "[STAGING] Trigger to enforce schema for staging Budget Allocation"
+        staging_section_start = time.time()        
+        try:
+            print(f"🔁 [STAGING] Triggering to enforce schema for Budget Allocation for {len(staging_df_concatenated)} row(s)...")
+            logging.info(f"🔁 [STAGING] Triggering to enforce schema for Budget Allocation for {len(staging_df_concatenated)} row(s)...")
+            staging_results_enforced = enforce_table_schema(schema_df_input=staging_df_concatenated,schema_type_mapping="staging_budget_allocation")
+            staging_df_enforced = staging_results_enforced["schema_df_final"]
+            staging_status_enforced = staging_results_enforced["schema_status_final"]
+            staging_summary_enforced = staging_results_enforced["schema_summary_final"]
+            if staging_status_enforced == "schema_succeed_all":
+                print(f"✅ [STAGING] Successfully triggered Budget Allocation schema enforcement with {staging_summary_enforced['schema_rows_output']}/{staging_summary_enforced['schema_rows_input']} enforced row(s) in {staging_summary_enforced['schema_time_elapsed']}s.")
+                logging.info(f"✅ [STAGING] Successfully triggered Budget Allocation schema enforcement with {staging_summary_enforced['schema_rows_output']}/{staging_summary_enforced['schema_rows_input']} enforced row(s) in {staging_summary_enforced['schema_time_elapsed']}s.")
+                staging_sections_status[staging_section_name] = "succeed"
+            else:
+                staging_sections_status[staging_section_name] = "failed"
+                print(f"❌ [STAGING] Failed to trigger Budget Allocation schema enforcement with {staging_summary_enforced['schema_rows_output']}/{staging_summary_enforced['schema_rows_input']} enforced row(s) in {staging_summary_enforced['schema_time_elapsed']}s.")
+                logging.error(f"❌ [STAGING] Failed to trigger Budget Allocation schema enforcement with {staging_summary_enforced['schema_rows_output']}/{staging_summary_enforced['schema_rows_input']} enforced row(s) in {staging_summary_enforced['schema_time_elapsed']}s.")
+        finally:
+            staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)        
+
+    # 1.1.8. Create new staging Budget Allocation table
+        staging_section_name = "[STAGING] Create new staging Budget Allocation table"
+        staging_section_start = time.time()     
+        staging_df_deduplicated = staging_df_enforced.drop_duplicates()
+        table_clusters_filtered = []
+        table_schemas_defined = []
+        try:
+            try:
+                print(f"🔍 [STAGING] Checking staging Budget Allocation table {staging_table_budget} existence...")
+                logging.info(f"🔍 [STAGING] Checking staging Budget Allocation table {staging_table_budget} existence...")
+                google_bigquery_client.get_table(staging_table_budget)
+                staging_table_exists = True
+            except Exception:
+                staging_table_exists = False
+            if not staging_table_exists:
+                print(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} not found then new table creation will be proceeding...")
+                logging.warning(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} not found then new table creation will be proceeding...")
+                for col, dtype in staging_df_deduplicated.dtypes.items():
+                    if dtype.name.startswith("int"):
+                        google_bigquery_type = "INT64"
+                    elif dtype.name.startswith("float"):
+                        google_bigquery_type = "FLOAT64"
+                    elif dtype.name == "bool":
+                        google_bigquery_type = "BOOL"
+                    elif "datetime" in dtype.name:
+                        google_bigquery_type = "TIMESTAMP"
+                    else:
+                        google_bigquery_type = "STRING"
+                    table_schemas_defined.append(bigquery.SchemaField(col, google_bigquery_type))
+                table_configuration_defined = bigquery.Table(staging_table_budget, schema=table_schemas_defined)
+                table_partition_effective = "date" if "date" in staging_df_deduplicated.columns else None
+                if table_partition_effective:
+                    table_configuration_defined.time_partitioning = bigquery.TimePartitioning(
+                        type_=bigquery.TimePartitioningType.DAY,
+                        field=table_partition_effective
+                    )
+                table_clusters_defined = ["chuong_trinh", "ma_ngan_sach_cap_1", "nhan_su"]
+                table_clusters_filtered = [f for f in table_clusters_defined if f in staging_df_deduplicated.columns]
+                if table_clusters_filtered:  
+                    table_configuration_defined.clustering_fields = table_clusters_filtered  
+                try:
+                    print(f"🔍 [STAGING] Creating staging Facebook Ads ad insights table with defined name {staging_table_ad} and partition on {table_partition_effective}...")
+                    logging.info(f"🔍 [STAGING] Creating staging Facebook Ads ad insights table with defined name {staging_table_ad} and partition on {table_partition_effective}...")
+                    table_metadata_defined = google_bigquery_client.create_table(table_configuration_defined)
+                    print(f"✅ [STAGING] Successfully created staging Facebook Ads ad insights table with actual name {table_metadata_defined.full_table_id}.")
+                    logging.info(f"✅ [STAGING] Successfully created staging Facebook Ads ad insights table with actual name {table_metadata_defined.full_table_id}.")
+                    staging_sections_status[staging_section_name] = "succeed"
+                except Exception as e:
+                    staging_sections_status[staging_section_name] = "failed"
+                    print(f"❌ [STAGING] Failed to create staging Facebook Ads ad insights table {staging_table_ad} due to {e}.")
+                    logging.error(f"❌ [STAGING] Failed to create staging Facebook Ads ad insights table {staging_table_ad} due to {e}.")
+                    raise RuntimeError(f"❌ [STAGING] Failed to create staging Facebook Ads ad insights table {staging_table_ad} due to {e}.") from e
+            else:
+                print(f"⚠️ [STAGING] Staging Facebook Ads ad insights table {staging_table_ad} already exists then creation will be skipped.")
+                logging.info(f"⚠️ [STAGING] Staging Facebook Ads ad insights table {staging_table_ad} already exists then creation will be skipped.")
+                staging_sections_status[staging_section_name] = "succeed"
+        finally:
+            staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)

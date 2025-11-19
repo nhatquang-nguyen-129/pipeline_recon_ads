@@ -262,6 +262,37 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
         finally:
             enrich_sections_time[enrich_section_name] = round(time.time() - enrich_section_start, 2)
 
+
+    # 1.1.5. Enrich budget allocation
+        try:
+            print(f"🔄 [STAGING] Enriching fields for {len(df_all)} row(s) of staging budget allocation field(s)...")
+            logging.info(f"🔄 [STAGING] Enriching fields for {len(df_all)} row(s) of staging budget allocation field(s)...")
+            for col in ["ngan_sach_ban_dau", "ngan_sach_dieu_chinh", "ngan_sach_bo_sung"]:
+                if col in df_all.columns:
+                    df_all[col] = pd.to_numeric(df_all[col], errors="coerce").fillna(0).astype(int)
+                else:
+                    df_all[col] = 0
+            df_all["ngan_sach_thuc_chi"] = df_all["ngan_sach_ban_dau"] + df_all["ngan_sach_dieu_chinh"] + df_all["ngan_sach_bo_sung"]
+            df_all["thoi_gian_bat_dau"] = pd.to_datetime(df_all.get("thoi_gian_bat_dau"), errors="coerce")
+            df_all["thoi_gian_ket_thuc"] = pd.to_datetime(df_all.get("thoi_gian_ket_thuc"), errors="coerce")
+            today = pd.to_datetime("today").normalize()
+            df_all["tong_so_ngay_thuc_chay"] = (df_all["thoi_gian_ket_thuc"] - df_all["thoi_gian_bat_dau"]).dt.days
+            df_all["tong_so_ngay_da_qua"] = ((today - df_all["thoi_gian_bat_dau"]).dt.days.clip(lower=0))
+            df_all["ngan_sach_he_thong"] = (df_all["ma_ngan_sach_cap_1"] == "KP") * df_all["ngan_sach_thuc_chi"]
+            df_all["ngan_sach_nha_cung_cap"] = (df_all["ma_ngan_sach_cap_1"] == "NC") * df_all["ngan_sach_thuc_chi"]
+            df_all["ngan_sach_kinh_doanh"] = (df_all["ma_ngan_sach_cap_1"] == "KD") * df_all["ngan_sach_thuc_chi"]
+            df_all["ngan_sach_tien_san"] = (df_all["ma_ngan_sach_cap_1"] == "CS") * df_all["ngan_sach_thuc_chi"]
+            df_all["ngan_sach_tuyen_dung"] = (df_all["ma_ngan_sach_cap_1"] == "HC") * df_all["ngan_sach_thuc_chi"]
+            df_all["ngan_sach_khac"] = df_all["ngan_sach_tien_san"] + df_all["ngan_sach_tuyen_dung"]
+            df_all = ensure_table_schema(df_all, "staging_budget_allocation")
+            print(f"✅ [STAGING] Successfully enriched {len(df_all)} row(s) of staging budget allocation.")
+            logging.info(f"✅ [STAGING] Successfully enriched {len(df_all)} row(s) of staging budget allocation.")  
+        except Exception as e:
+            print(f"❌ [STAGING] Failed to enrich staging budget allocation due to {e}.")
+            logging.error(f"❌ [STAGING] Failed to enrich staging budget allocation due to {e}.")
+            raise
+
+
     # 2.1.5. Enrich other field(s) for staging Budget Allocation
         enrich_section_name = "[ENRICH] Enrich other field(s) for staging Budget Allocation"
         enrich_section_start = time.time()            
