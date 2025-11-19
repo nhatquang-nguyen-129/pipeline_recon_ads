@@ -2,23 +2,26 @@
 ==================================================================
 BUDGET UPDATE MODULE
 ------------------------------------------------------------------
-This module performs **incremental updates** to budget allocation  
-data at the raw layer, enabling ingestion from multiple sources  
-and departments into Google BigQuery without reloading the entire  
-dataset.
+This module performs incremental updates to Budget Allocation data 
+at the raw layer, providing an efficient mechanism for refreshing  
+recent or specific-date datasets without the need for full reloads.
 
-It is designed to support scheduled refreshes, cross-department  
-budget consolidation, and ad-hoc adjustments to allocation data.
+By supporting targeted updates (per month, layer or entity), it  
+enables faster turnaround for near-real-time dashboards and daily  
+data sync jobs while maintaining historical accuracy and integrity.
 
-✔️ Supports multi-source ingestion (Google Sheets, CSV, APIs, etc.)  
-✔️ Handles department-level budget segmentation and mapping  
-✔️ Loads data incrementally to ensure minimal latency and freshness  
+✔️ Handles incremental data ingestion from the Google Sheets API
+✔️ Supports selective updates for campaign, adset, ad or creative   
+✔️ Preserves schema alignment with staging and MART layers  
+✔️ Implements error handling and retry logic for partial failures  
+✔️ Designed for integration in daily or on-demand sync pipelines  
 
-⚠️ This module is responsible for *RAW layer updates only*. It does  
-not perform advanced transformations or generate staging/MART tables  
-directly.
+⚠️ This module is strictly responsible for *RAW layer updates only*.  
+It does not perform transformations, enrichment, or aggregations.  
+Processed data is consumed by the STAGING and MART modules.
 ==================================================================
 """
+
 # Add root directory to sys.path for absolute imports of internal modules
 import os
 import sys
@@ -89,85 +92,36 @@ MODE = os.getenv("MODE")
 
 # 1.1. Update budget allocation data for a given date range
 def update_budget_allocation(thang: str) -> None:
-    print(f"🚀 [UPDATE] Starting to update budget allocation for {thang}...")
-    logging.info(f"🚀 [UPDATE] Starting to update budget allocation for {thang}...")
+    print(f"🚀 [UPDATE] Starting to update Budget Allocation for month {thang}...")
+    logging.info(f"🚀 [UPDATE] Starting to update Budget Allocation for month {thang}...")
 
-    # 1.1.1. Start timing the update process
-    start_time = time.time()
-    
-    # 1.1.2. Initialize Google Secret Manager client
-    try:
-        print(f"🔍 [UPDATE] Initializing Google Secret Manager client for Google Cloud Platform project {PROJECT}...")
-        logging.info(f"🔍 [UPDATE] Initializing Google Secret Manager client for Google Cloud Platform project {PROJECT}...")
-        google_secret_client = secretmanager.SecretManagerServiceClient()
-        print(f"✅ [UPDATE] Successfully initialized Google Secret Manager client for Google Cloud project {PROJECT}.")
-        logging.info(f"✅ [UPDATE] Successfully initialized Google Secret Manager client for Google Cloud project {PROJECT}.")
-    except DefaultCredentialsError as e:
-        raise RuntimeError("❌ [UPDATE] Failed to initialize Google Secret Manager client due to credentials error.") from e
-    except PermissionDenied as e:
-        raise RuntimeError("❌ [UPDATE] Failed to initialize Google Secret Manager client due to permission denial.") from e
-    except NotFound as e:
-        raise RuntimeError("❌ [UPDATE] Failed to initialize Google Secret Manager client because secret not found.") from e
-    except GoogleAPICallError as e:
-        raise RuntimeError("❌ [UPDATE] Failed to initialize Google Secret Manager client due to API call error.") from e
-    except Exception as e:
-        raise RuntimeError(f"❌ [UPDATE] Failed to initialize Google Secret Manager client due to unexpected error {e}.") from e
-    
-    # 1.1.3. Prepare Google Secret Manager id(s)
-    print(f"🔍 [UPDATE] Retrieving budget information for {ACCOUNT} from Google Secret Manager...")
-    logging.info(f"🔍 [UPDATE] Retrieving budget information for {ACCOUNT} from Google Secret Manager...") 
-    secret_id = f"{COMPANY}_secret_{DEPARTMENT}_{PLATFORM}_sheet_id_{ACCOUNT}"
-    secret_name = f"projects/{PROJECT}/secrets/{secret_id}/versions/latest"
-    response = google_secret_client.access_secret_version(request={"name": secret_name})
-    sheet_id = response.payload.data.decode("UTF-8")
-    print(f"✅ [UPDATE] Successfully retrieved budget allocation sheet_id {sheet_id} for environment variable {ACCOUNT} from Google Secret Manager.")
-    logging.info(f"✅ [UPDATE] Successfully retrieved budget allocation sheet_id {sheet_id} for environment variable {ACCOUNT} from Google Secret Manager.")
-    
-    # 1.1.4. Initialize Google Sheets client
-    try:
-        print(f"🔍 [UPDATE] Initializing Google Sheets client for sheet_id {sheet_id}...")
-        logging.info(f"🔍 [UPDATE] Initializing Google Sheets client for sheet_id {sheet_id}...")                
-        scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-        creds, _ = default(scopes=scopes)
-        google_gspread_client = gspread.Client(auth=creds)
-        google_gspread_client.session = AuthorizedSession(creds)
-        print(f"✅ [MART] Successfully initialized Google Sheets client for sheet_id {sheet_id} with scopes {scopes}.")
-        logging.info(f"✅ [MART] Successfully initialized Google Sheets client for sheet_id {sheet_id} with scopes {scopes}.")
-    except DefaultCredentialsError as e:
-        raise RuntimeError("❌ [MART] Failed to initialize Google Sheets client due to credentials error.") from e
-    except SpreadsheetNotFound as e:
-        raise RuntimeError(f"❌ [MART] Failed to initialize Google Sheets client because spreadsheet {sheet_id} not found.") from e
-    except WorksheetNotFound as e:
-        raise RuntimeError(f"❌ [MART] Failed to initialize Google Sheets client because worksheet not found in spreadsheet {sheet_id}.") from e
-    except APIError as e:
-        raise RuntimeError("❌ [MART] Failed to initialize Google Sheets client due to API error.") from e
-    except GSpreadException as e:
-        raise RuntimeError("❌ [MART] Failed to initialize Google Sheets client due to Gspread client error.") from e
-    except Exception as e:
-        raise RuntimeError(f"❌ [MART] Failed to initialize Google Sheets client due to {e}.") from e    
+    # 1.1.1. Start timing TikTok Ads campaign insights update
+    update_time_start = time.time()
+    update_sections_status = {}
+    update_sections_time = {}
+    print(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {thang} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    logging.info(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {thang} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
 
-    # 1.1.5. Call Google Sheets API
     try:
-        print(f"🔍 [UPDATE] Retrieving all worksheet(s) in Google Sheets file {sheet_id} for classification...")
-        logging.info(f"🔍 [UPDATE] Retrieving all worksheet(s) in Google Sheets file {sheet_id} for classification...")
-        sh = google_gspread_client.open_by_key(sheet_id)
-        worksheet_list = [ws.title for ws in sh.worksheets()]
-        print(f"✅ [UPDATE] Successfully retrieved {len(worksheet_list)} worksheet(s) from Google Sheets file {sheet_id}.")
-        logging.info(f"✅ [UPDATE] Successfully retrieved {len(worksheet_list)} worksheet(s) from Google Sheets file {sheet_id}.")
-    except Exception as e:
-        print(f"❌ [UPDATE] Failed to fetch data from worksheet(s) in {sheet_id} file due to {e}.")
-        logging.error(f"❌ [UPDATE] Failed to fetch data from worksheet(s) in {sheet_id} file due to {e}.")
-
-    # 1.1.6. Prepare id(s)
-    year, month = thang.split("-")
-    worksheet_monthly = f"m{int(month):02d}{year}"
-    pattern_special = re.compile(rf".*{year}$")
-    monthly_sheets = [ws for ws in worksheet_list if ws == worksheet_monthly]
-    special_sheets = [ws for ws in worksheet_list if pattern_special.match(ws) and not ws.startswith("m")]
-    print(f"🔍 [UPDATE] Preparing to ingest {len(monthly_sheets)} monthly sheet(s) included {monthly_sheets} "
-          f"and {len(special_sheets)} special sheet(s) included {special_sheets}.")
-    logging.info(f"🔍 [UPDATE] Preparing to ingest {len(monthly_sheets)} monthly sheet(s) included {monthly_sheets} "
-          f"and {len(special_sheets)} special sheet(s) included {special_sheets}.")
+    
+    # 1.1.2. Convert YYYY-MM input to mMMYYYY ingest_name_sheet
+        update_section_name = "[UPDATE] Convert YYYY-MM input to mMMYYYY ingest_name_sheet"
+        update_section_start = time.time()
+        try:
+            print(f"🔄 [UPDATE] Converting {thang} from YYYY-MM format to mMMYYY with ingest_name_sheet {ingest_name_sheet} ...")
+            logging.info(f"🔄 [UPDATE] Converting {thang} from YYYY-MM format to mMMYYY with ingest_name_sheet {ingest_name_sheet} ...")
+            year, month = thang.split("-")
+            month = month.zfill(2)
+            ingest_name_sheet = f"m{month}{year}"
+            print(f"✅ [UPDATE] Successfully converted {thang} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
+            logging.info(f"✅ [UPDATE] Successfully converted {thang} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
+            update_sections_status[update_section_name] = "succeed"
+        except Exception as e:
+            print(f"❌ [UPDATE] Failed to convert {thang} from YYYY-MM format to mMMYYY ingest_name_sheet due to {e}.")
+            logging.error(f"❌ [UPDATE] Failed to convert {thang} from YYYY-MM format to mMMYYY ingest_name_sheet due to {e}.")
+            update_sections_status[update_section_name] = "failed"
+        finally:
+            update_sections_time[update_section_name] = round(time.time() - update_section_start, 2)
 
     # 1.1.4. Ingest monthly budget
     df_monthly = None
