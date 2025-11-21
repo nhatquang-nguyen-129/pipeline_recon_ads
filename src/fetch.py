@@ -40,7 +40,10 @@ import time
 from google.auth import default
 from google.auth.transport.requests import AuthorizedSession
 
-# Add Google Spreadsheets API libraries for integration
+# Add Google Secret Manager modules for integration
+from google.cloud import secretmanager
+
+# Add Google Spreadsheets API modules for integration
 import gspread
 
 # Add internal Budget module for handling
@@ -70,9 +73,9 @@ MODE = os.getenv("MODE")
 # 1. FETCH BUDGET ALLCATION
 
 # 1.1. Fetch Budget Allcation from Google Sheets
-def fetch_budget_allocation(fetch_id_sheet: str, fetch_name_sheet: str) -> pd.DataFrame:
-    print(f"🚀 [FETCH] Starting to fetch budget allocation from {fetch_name_sheet} sheet name in {fetch_id_sheet} Google Sheets sheet_id...")
-    logging.info(f"🚀 [FETCH] Starting to fetch budget allocation from {fetch_name_sheet} sheet name in {fetch_id_sheet} Google Sheets sheet_id...")
+def fetch_budget_allocation(thang: str) -> pd.DataFrame:
+    print(f"🚀 [FETCH] Starting to fetch budget allocation for month {thang}...")
+    logging.info(f"🚀 [FETCH] Starting to fetch budget allocation for month {thang}...")
 
     # 1.1.1. Start timing the Budget Allocation fetching
     fetch_time_start = time.time()   
@@ -83,7 +86,63 @@ def fetch_budget_allocation(fetch_id_sheet: str, fetch_name_sheet: str) -> pd.Da
 
     try:
 
-    # 1.1.2. Initialize Google Sheets client
+    # 1.1.2. Convert YYYY-MM input to mMMYYYY fetch_name_sheet
+        fetch_section_name = "[FETCH] Convert YYYY-MM input to mMMYYYY fetch_name_sheet"
+        fetch_section_start = time.time()
+        try:
+            print(f"🔄 [FETCH] Converting {thang} from YYYY-MM format to mMMYYY...")
+            logging.info(f"🔄 [FETCH] Converting {thang} from YYYY-MM format to mMMYYY...")
+            year, month = thang.split("-")
+            month = month.zfill(2)
+            fetch_name_sheet = f"m{month}{year}"
+            print(f"✅ [FETCH] Successfully converted {thang} from YYYY-MM format to mMMYYYY with fetch_name_sheet {fetch_name_sheet}.")
+            logging.info(f"✅ [FETCH] Successfully converted {thang} from YYYY-MM format to mMMYYYY with fetch_name_sheet {fetch_name_sheet}.")
+            fetch_sections_status[fetch_section_name] = "succeed"
+        except Exception as e:
+            print(f"❌ [FETCH] Failed to convert {thang} from YYYY-MM format to mMMYYY due to {e}.")
+            logging.error(f"❌ [FETCH] Failed to convert {thang} from YYYY-MM format to mMMYYY due to {e}.")
+            fetch_sections_status[fetch_section_name] = "failed"
+        finally:
+            fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)
+
+    # 1.1.2. Initialize Google Secret Manager client
+        fetch_section_name = "[FETCH] Initialize Google Secret Manager client"
+        fetch_section_start = time.time()                
+        try:
+            print(f"🔍 [FETCH] Initializing Google Secret Manager client for Google Cloud Platform project {PROJECT}...")
+            logging.info(f"🔍 [FETCH] Initializing Google Secret Manager client for Google Cloud Platform project {PROJECT}...")
+            google_secret_client = secretmanager.SecretManagerServiceClient()
+            print(f"✅ [FETCH] Successfully initialized Google Secret Manager client for Google Cloud project {PROJECT}.")
+            logging.info(f"✅ [FETCH] Successfully initialized Google Secret Manager client for Google Cloud project {PROJECT}.")
+            fetch_sections_status[fetch_section_name] = "succeed"
+        except Exception as e:
+            fetch_sections_status[fetch_section_name] = "failed"
+            print(f"❌ [FETCH] Failed to initialize Google Secret Manager client for Google Cloud Platform project {PROJECT} due to {e}.")
+            logging.error(f"❌ [FETCH] Failed to initialize Google Secret Manager client for Google Cloud Platform project {PROJECT} due to {e}.")
+        finally:
+            fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)      
+
+    # 1.1.3. Get Budget Allocation from Google Secret Manager
+        fetch_section_name = "[FETCH] Get Budget Allocation from Google Secret Manager"
+        fetch_section_start = time.time()         
+        try:
+            print(f"🔍 [FETCH] Retrieving Budget Allocation sheet_id for account {ACCOUNT} from Google Secret Manager...")
+            logging.info(f"🔍 [FETCH] Retrieving Budget Allocation sheet_id for account {ACCOUNT} from Google Secret Manager...")
+            sheet_secret_id = f"{COMPANY}_secret_{DEPARTMENT}_{PLATFORM}_sheet_id_{ACCOUNT}"
+            sheet_secret_name = f"projects/{PROJECT}/secrets/{sheet_secret_id}/versions/latest"
+            sheet_secret_response = google_secret_client.access_secret_version(request={"name": sheet_secret_name})
+            fetch_id_sheet = sheet_secret_response.payload.data.decode("utf-8")
+            print(f"✅ [FETCH] Successfully retrieved Budget Allocation sheet_id {fetch_id_sheet} for account {ACCOUNT} from Google Secret Manager.")
+            logging.info(f"✅ [FETCH] Successfully retrieved Budget Allocation sheet_id {fetch_id_sheet} for account {ACCOUNT} from Google Secret Manager.")
+            fetch_sections_status[fetch_section_name] = "succeed"
+        except Exception as e:
+            fetch_sections_status[fetch_section_name] = "failed"
+            print(f"❌ [FETCH] Failed to retrieve Budget Allocation sheet_id for account {ACCOUNT} from Google Secret Manager due to {e}.")
+            logging.error(f"❌ [FETCH] Failed to retrieve Budget Allocation sheet_id for account {ACCOUNT} from Google Secret Manager due to {e}.")
+        finally:
+            fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)
+
+    # 1.1.4. Initialize Google Sheets client
         fetch_section_name = "[FETCH] Initialize Google Sheets client"
         fetch_section_start = time.time()            
         try:
@@ -103,7 +162,7 @@ def fetch_budget_allocation(fetch_id_sheet: str, fetch_name_sheet: str) -> pd.Da
         finally:
             fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2) 
     
-    # 1.1.3. Make Google Sheets API call for worksheet recording
+    # 1.1.5. Make Google Sheets API call for worksheet recording
         fetch_section_name = "[FETCH] Make Google Sheets API call for worksheet recording"
         fetch_section_start = time.time()             
         try:
@@ -126,7 +185,7 @@ def fetch_budget_allocation(fetch_id_sheet: str, fetch_name_sheet: str) -> pd.Da
         finally:
             fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)
    
-    # 1.1.4. Trigger to enforce schema for Budget Allocation
+    # 1.1.6. Trigger to enforce schema for Budget Allocation
         fetch_section_name = "[FETCH] Trigger to enforce schema for Budget Allocation"
         fetch_section_start = time.time()              
         try:            
@@ -147,7 +206,7 @@ def fetch_budget_allocation(fetch_id_sheet: str, fetch_name_sheet: str) -> pd.Da
         finally:
             fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)
 
-    # 1.1.5. Summarize fetch result(s) for Budget Allocation
+    # 1.1.7. Summarize fetch results for Budget Allocation
     finally:
         fetch_time_elapsed = round(time.time() - fetch_time_start, 2)
         fetch_df_final = fetch_df_enforced.copy() if "fetch_df_enforced" in locals() and not fetch_df_enforced.empty else pd.DataFrame()
