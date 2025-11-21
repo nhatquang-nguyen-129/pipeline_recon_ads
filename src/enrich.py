@@ -16,8 +16,8 @@ to build insight-ready tables.
 ✔️ Cleans and validates data to ensure schema and field consistency  
 ✔️ Reduces payload size by removing redundant or raw field(s)
 
-⚠️ This module focuses *only* on enrichment and transformation logic.  
-It does **not** handle data fetching, ingestion or staging
+⚠️ This module focuses only on enrichment and transformation logic.  
+It does not handle data fetching, ingestion or staging.
 ==================================================================
 """
 
@@ -32,17 +32,17 @@ from datetime import datetime
 # Add Python logging ultilities for integraton
 import logging
 
-# Add Python Pandas libraries for integration
-import pandas as pd
-
 # Add Python timezone ultilities for integration
 import pytz
 
-# Add Python "re" libraries for integraton
+# Add Python regular expression operations ultilities for integraton
 import re
 
 # Add Python time ultilities for integration
 import time
+
+# Add Python Pandas libraries for integration
+import pandas as pd
 
 # Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
@@ -284,7 +284,6 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
             df_all["ngan_sach_tien_san"] = (df_all["ma_ngan_sach_cap_1"] == "CS") * df_all["ngan_sach_thuc_chi"]
             df_all["ngan_sach_tuyen_dung"] = (df_all["ma_ngan_sach_cap_1"] == "HC") * df_all["ngan_sach_thuc_chi"]
             df_all["ngan_sach_khac"] = df_all["ngan_sach_tien_san"] + df_all["ngan_sach_tuyen_dung"]
-            df_all = ensure_table_schema(df_all, "staging_budget_allocation")
             print(f"✅ [STAGING] Successfully enriched {len(df_all)} row(s) of staging budget allocation.")
             logging.info(f"✅ [STAGING] Successfully enriched {len(df_all)} row(s) of staging budget allocation.")  
         except Exception as e:

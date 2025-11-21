@@ -6,21 +6,22 @@ This module ingests raw data from the Budget Allocation fetching
 module into Google BigQuery, establishing the foundational raw 
 layer used for centralized storage and historical retention.
 
-It manages the complete ingestion flow from authentication and 
-data fetching, to enrichment, schema validation and loading into 
-Google BigQuery tables.
+It manages the complete ingestion flow — from authentication to 
+data fetching, schema validation and loading into Google BigQuery 
+tables segmented by campaign, ad, creative and metadata.
 
 ✔️ Supports both append and truncate modes via write_disposition
-✔️ Validates data structure using centralized schema utilities  
-✔️ Integrates enrichment routines before loading into BigQuery  
-✔️ Implements granular logging and CSV-based error traceability  
-✔️ Ensures pipeline reliability through retry and checkpoint logic  
+✔️ Validates data structure using centralized schema utilities
+✔️ Applies lightweight normalization required for raw-layer loading
+✔️ Implements granular logging and CSV-based error traceability
+✔️ Ensures pipeline reliability through retry and checkpoint logic
 
-⚠️ This module is dedicated solely to *raw-layer ingestion*.  
-It does **not** handle advanced transformations, metric modeling, 
-or aggregated data processing beyond the ingestion boundary.
+⚠️ This module is dedicated solely to raw-layer ingestion.  
+It does not handle advanced transformations, metric modeling or 
+aggregated data processing beyond the ingestion boundary.
 ==================================================================
 """
+
 # Add root directory to sys.path for absolute imports of internal modules
 import os
 import sys
@@ -29,14 +30,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.
 # Add logging ultilities for integration
 import logging
 
-# Add Python Pandas library for integration
-import pandas as pd
-
 # Add Python time ultilities for integration
 import time
 
 # Add UUID libraries for integration
 import uuid
+
+# Add Python Pandas libraries for integration
+import pandas as pd
 
 # Add Google API core modules for integration
 from google.api_core.exceptions import NotFound
@@ -44,7 +45,7 @@ from google.api_core.exceptions import NotFound
 # Add Google Cloud library for integration
 from google.cloud import bigquery
 
-# Add internal Google Sheet module for handing
+# Add internal Budget Allocation module for handing
 from src.fetch import fetch_budget_allocation
 from src.schema import enforce_table_schema
 
@@ -72,12 +73,9 @@ MODE = os.getenv("MODE")
 # 1. INGEST BUDGET ALLOCATION
 
 # 1.1. Ingest Budget Allocation to Google BigQuery
-def ingest_budget_allocation(
-    ingest_id_sheet: str,
-    ingest_name_sheet: str
-) -> pd.DataFrame:
-    print(f"🚀 [INGEST] Starting to ingest budget allocation for sheet name {ingest_name_sheet} in Google Sheet sheet_id {ingest_id_sheet}..")
-    logging.info(f"🚀 [INGEST] Starting to ingest budget allocation for sheet name {ingest_name_sheet} in Google Sheet sheet_id {ingest_id_sheet}..")
+def ingest_budget_allocation(thang: str) -> pd.DataFrame:
+    print(f"🚀 [INGEST] Starting to ingest Budget Allocation for month {thang}...")
+    logging.info(f"🚀 [INGEST] Starting to ingest Budget Allocation for month {thang}...")
 
     # 1.1.1. Start timing Budget Allocation ingestion
     ingest_time_start = time.time()
@@ -88,13 +86,32 @@ def ingest_budget_allocation(
 
     try:
 
-    # 1.1.2. Trigger to fetch Budget Allocation
+    # 1.1.2. Convert YYYY-MM input to mMMYYYY ingest_name_sheet
+        ingest_section_name = "[INGEST] Convert YYYY-MM input to mMMYYYY ingest_name_sheet"
+        ingest_section_start = time.time()
+        try:
+            print(f"🔄 [INGEST] Converting {thang} from YYYY-MM format to mMMYYY...")
+            logging.info(f"🔄 [INGEST] Converting {thang} from YYYY-MM format to mMMYYY...")
+            year, month = thang.split("-")
+            month = month.zfill(2)
+            ingest_name_sheet = f"m{month}{year}"
+            print(f"✅ [INGEST] Successfully converted {thang} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
+            logging.info(f"✅ [INGEST] Successfully converted {thang} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
+            ingest_sections_status[ingest_section_name] = "succeed"
+        except Exception as e:
+            print(f"❌ [INGEST] Failed to convert {thang} from YYYY-MM format to mMMYYY due to {e}.")
+            logging.error(f"❌ [INGEST] Failed to convert {thang} from YYYY-MM format to mMMYYY due to {e}.")
+            ingest_sections_status[ingest_section_name] = "failed"
+        finally:
+            ingest_sections_status[ingest_section_name] = round(time.time() - ingest_section_start, 2)
+
+    # 1.1.3. Trigger to fetch Budget Allocation
         ingest_section_name = "[INGEST] Trigger to fetch Budget Allocation"
         ingest_section_start = time.time()        
         try:
-            print(f"🔁 [INGEST] Triggering to fetch Budget Allocation for sheet name {ingest_name_sheet} from Google Sheets sheet_id {ingest_id_sheet}...")
-            logging.info(f"🔁 [INGEST] Triggering to fetch Budget Allocation for sheet name {ingest_name_sheet} from Google Sheets sheet_id {ingest_id_sheet}...")
-            ingest_results_fetched = fetch_budget_allocation(fetch_id_sheet=ingest_id_sheet, fetch_name_sheet=ingest_name_sheet)
+            print(f"🔁 [INGEST] Triggering to fetch Budget Allocation for month {thang}...")
+            logging.info(f"🔁 [INGEST] Triggering to fetch Budget Allocation for month {thang}...")
+            ingest_results_fetched = fetch_budget_allocation(thang=thang)
             ingest_df_fetched = ingest_results_fetched["fetch_df_final"]
             ingest_status_fetched = ingest_results_fetched["fetch_status_final"]
             ingest_summary_fetched = ingest_results_fetched["fetch_summary_final"]
@@ -113,35 +130,24 @@ def ingest_budget_allocation(
         finally:
             ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
     
-    # 1.1.3. Prepare Google BigQuery table_id for ingestion
-        ingest_section_name = "[INGEST] Prepare Google BigQuery table_id for ingestion"
-        ingest_section_start = time.time()    
-        try:            
-            raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"
-            raw_table_budget = f"{PROJECT}.{raw_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_{ingest_name_sheet}"
-            print(f"🔍 [INGEST] Proceeding to ingest Budget Allocation for {len(ingest_df_fetched)} fetched row(s) with Google BigQuery table_id {raw_table_budget}...")
-            logging.info(f"🔍 [INGEST] Proceeding to ingest Budget Allocation for {len(ingest_df_fetched)} fetched row(s) with Google BigQuery table_id {raw_table_budget}...")
-        finally:
-            ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
-    
     # 1.1.4. Trigger to enforce schema for Budget Allocation
         ingest_section_name = "[INGEST] Trigger to enforce schema for Budget Allocation"
         ingest_section_start = time.time()
         try:
-            print(f"🔄 [INGEST] Triggering to enforce schema for Budget Allocation with {len(ingest_df_fetched)} row(s)...")
-            logging.info(f"🔄 [INGEST] Triggering to enforce schema for Budget Allocation with {len(ingest_df_fetched)} row(s)...")
+            print(f"🔄 [INGEST] Triggering to enforce schema for raw Budget Allocation with {len(ingest_df_fetched)} row(s)...")
+            logging.info(f"🔄 [INGEST] Triggering to enforce schema for raw Budget Allocation with {len(ingest_df_fetched)} row(s)...")
             ingest_results_enforced = enforce_table_schema(ingest_df_fetched, "ingest_budget_allocation")
             ingest_summary_enforced = ingest_results_enforced["schema_summary_final"]
             ingest_status_enforced = ingest_results_enforced["schema_status_final"]
             ingest_df_enforced = ingest_results_enforced["schema_df_final"]    
             if ingest_status_enforced == "schema_succeed_all":
-                print(f"✅ [INGEST] Successfully triggered Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
-                logging.info(f"✅ [INGEST] Successfully triggered Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
+                print(f"✅ [INGEST] Successfully triggered schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
+                logging.info(f"✅ [INGEST] Successfully triggered schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
                 ingest_sections_status[ingest_section_name] = "succeed"
             else:
                 ingest_sections_status[ingest_section_name] = "failed"
-                print(f"❌ [INGEST] Failed to trigger Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) due to failed section(s) {', '.join(ingest_summary_enforced['schema_sections_failed'])} in {ingest_summary_enforced['fetch_time_elapsed']}s.")
-                logging.error(f"❌ [INGEST] Failed to trigger Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) due to failed section(s) {', '.join(ingest_summary_enforced['schema_sections_failed'])} in {ingest_summary_enforced['fetch_time_elapsed']}s.")
+                print(f"❌ [INGEST] Failed to trigger schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) due to failed section(s) {', '.join(ingest_summary_enforced['schema_sections_failed'])} in {ingest_summary_enforced['fetch_time_elapsed']}s.")
+                logging.error(f"❌ [INGEST] Failed to trigger schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) due to failed section(s) {', '.join(ingest_summary_enforced['schema_sections_failed'])} in {ingest_summary_enforced['fetch_time_elapsed']}s.")
         finally:
             ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
 
@@ -162,7 +168,18 @@ def ingest_budget_allocation(
         finally:
             ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
 
-    # 1.1.6. Delete existing row(s) or create new table if it not exist
+    # 1.1.6. Prepare Google BigQuery table_id for ingestion
+        ingest_section_name = "[INGEST] Prepare Google BigQuery table_id for ingestion"
+        ingest_section_start = time.time()    
+        try:            
+            raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"
+            raw_table_budget = f"{PROJECT}.{raw_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_{ingest_name_sheet}"
+            print(f"🔍 [INGEST] Proceeding to ingest Budget Allocation for {len(ingest_df_fetched)} fetched row(s) with Google BigQuery table_id {raw_table_budget}...")
+            logging.info(f"🔍 [INGEST] Proceeding to ingest Budget Allocation for {len(ingest_df_fetched)} fetched row(s) with Google BigQuery table_id {raw_table_budget}...")
+        finally:
+            ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
+
+    # 1.1.7. Delete existing row(s) or create new table if it not exist
         ingest_section_name = "[INGEST] Delete existing row(s) or create new table if it not exist"
         ingest_section_start = time.time()
         try:
@@ -171,16 +188,15 @@ def ingest_budget_allocation(
             table_clusters_filtered = []
             table_schemas_defined = []
             try:
-                print(f"🔍 [INGEST] Checking Budget Allocation table {raw_table_budget} existence...")
-                logging.info(f"🔍 [INGEST] Checking Budget Allocation table {raw_table_budget} existence...")
+                print(f"🔍 [INGEST] Checking raw Budget Allocation table {raw_table_budget} existence...")
+                logging.info(f"🔍 [INGEST] Checking raw Budget Allocation table {raw_table_budget} existence...")
                 google_bigquery_client.get_table(raw_table_budget)
                 ingest_table_existed = True
             except NotFound:
                 ingest_table_existed = False
             except Exception:
-                print(f"❌ [INGEST] Failed to check Budget Allocation table {raw_table_budget} existence due to {e}.")
-                logging.error(f"❌ [INGEST] Failed to check Budget Allocation table {raw_table_budget} existence due to {e}.")
-                raise RuntimeError(f"❌ [INGEST] Failed to check Budget Allocation table {raw_table_budget} existence due to {e}.")
+                print(f"❌ [INGEST] Failed to check raw Budget Allocation table {raw_table_budget} existence due to {e}.")
+                logging.error(f"❌ [INGEST] Failed to check raw Budget Allocation table {raw_table_budget} existence due to {e}.")
             if not ingest_table_existed:
                 print(f"⚠️ [INGEST] Budget Allocation table {raw_table_budget} not found then table creation will be proceeding...")
                 logging.info(f"⚠️ [INGEST] Budget Allocation table {raw_table_budget} not found then table creation will be proceeding...")
@@ -207,18 +223,17 @@ def ingest_budget_allocation(
                 if table_clusters_filtered:  
                     table_configuration_defined.clustering_fields = table_clusters_filtered  
                 try:    
-                    print(f"🔍 [INGEST] Creating Budget Allocation table defined name {raw_table_budget} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}...")
-                    logging.info(f"🔍 [INGEST] Creating Budget Allocation table defined name {raw_table_budget} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}...")
+                    print(f"🔍 [INGEST] Creating raw Budget Allocation table defined name {raw_table_budget} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}...")
+                    logging.info(f"🔍 [INGEST] Creating raw Budget Allocation table defined name {raw_table_budget} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}...")
                     table_metadata_defined = google_bigquery_client.create_table(table_configuration_defined)
-                    print(f"✅ [INGEST] Successfully created Budget Allocation table actual name {table_metadata_defined.full_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}.")
-                    logging.info(f"✅ [INGEST] Successfully created Budget Allocation table actual name {table_metadata_defined.full_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}.")
+                    print(f"✅ [INGEST] Successfully created raw Budget Allocation table actual name {table_metadata_defined.full_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}.")
+                    logging.info(f"✅ [INGEST] Successfully created raw Budget Allocation table actual name {table_metadata_defined.full_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}.")
                 except Exception as e:
-                    print(f"❌ [INGEST] Failed to create Budget Allocation table {raw_table_budget} due to {e}.")
-                    logging.error(f"❌ [INGEST] Failed to create Budget Allocation table {raw_table_budget} due to {e}.")
-                    raise RuntimeError(f"❌ [INGEST] Failed to create Budget Allocation table {raw_table_budget} due to {e}.")
+                    print(f"❌ [INGEST] Failed to create raw Budget Allocation table {raw_table_budget} due to {e}.")
+                    logging.error(f"❌ [INGEST] Failed to create raw Budget Allocation table {raw_table_budget} due to {e}.")
             else:
-                print(f"🔄 [INGEST] Found Budget Allocation table {raw_table_budget} then existing row(s) deletion will be proceeding...")
-                logging.info(f"🔄 [INGEST] Found Budget Allocation table {raw_table_budget} then existing row(s) deletion will be proceeding...")
+                print(f"🔄 [INGEST] Found raw Budget Allocation table {raw_table_budget} then existing row(s) deletion will be proceeding...")
+                logging.info(f"🔄 [INGEST] Found raw Budget Allocation table {raw_table_budget} then existing row(s) deletion will be proceeding...")
                 unique_keys = ingest_df_deduplicated[["thang"]].dropna().drop_duplicates()
                 if not unique_keys.empty:
                     temp_table_id = f"{PROJECT}.{raw_dataset}.temp_table_campaign_metadata_delete_keys_{uuid.uuid4().hex[:8]}"
@@ -238,39 +253,39 @@ def ingest_budget_allocation(
                     result = google_bigquery_client.query(delete_query).result()
                     google_bigquery_client.delete_table(temp_table_id, not_found_ok=True)
                     deleted_rows = result.num_dml_affected_rows
-                    print(f"✅ [INGEST] Successfully deleted {deleted_rows} existing row(s) of Budget Allocation table {raw_table_budget}.")
-                    logging.info(f"✅ [INGEST] Successfully deleted {deleted_rows} existing row(s) of Budget Allocation table {raw_table_budget}.")
+                    print(f"✅ [INGEST] Successfully deleted {deleted_rows} existing row(s) of raw Budget Allocation table {raw_table_budget}.")
+                    logging.info(f"✅ [INGEST] Successfully deleted {deleted_rows} existing row(s) of raw Budget Allocation table {raw_table_budget}.")
                 else:
-                    print(f"⚠️ [INGEST] No unique 'thang' key found in Budget Allocation table {raw_table_budget} then existing row(s) deletion is skipped.")
-                    logging.warning(f"⚠️ [INGEST] No unique 'thang' key found in Budget Allocation table {raw_table_budget} then existing row(s) deletion is skipped.")
+                    print(f"⚠️ [INGEST] No unique 'thang' key found in raw Budget Allocation table {raw_table_budget} then existing row(s) deletion is skipped.")
+                    logging.warning(f"⚠️ [INGEST] No unique 'thang' key found in raw Budget Allocation table {raw_table_budget} then existing row(s) deletion is skipped.")
             ingest_sections_status[ingest_section_name] = "succeed"
         except Exception as e:
             ingest_sections_status[ingest_section_name] = "failed"
-            print(f"❌ [INGEST] Failed to delete existing row(s) or create new table {raw_table_budget} if it not exist for Budget Allocation due to {e}.")
-            logging.error(f"❌ [INGEST] Failed to delete existing row(s) or create new table {raw_table_budget} if it not exist for Budget Allocation due to {e}.")
+            print(f"❌ [INGEST] Failed to delete existing row(s) or create new table {raw_table_budget} if it not exist for raw Budget Allocation due to {e}.")
+            logging.error(f"❌ [INGEST] Failed to delete existing row(s) or create new table {raw_table_budget} if it not exist for raw Budget Allocation due to {e}.")
         finally:
             ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
 
-    # 1.1.7. Upload Budget Allocation to Google BigQuery
+    # 1.1.8. Upload Budget Allocation to Google BigQuery
         ingest_section_name = "[INGEST] Upload Budget Allocation to Google BigQuery"
         ingest_section_start = time.time()
         try:
-            print(f"🔍 [INGEST] Uploading {len(ingest_df_deduplicated)} row(s) of Budget Allocation to Google BigQuery table {raw_table_budget}...")
-            logging.info(f"🔍 [INGEST] Uploading {len(ingest_df_deduplicated)} row(s) of Budget Allocation to Google BigQuery table {raw_table_budget}...")
+            print(f"🔍 [INGEST] Uploading {len(ingest_df_deduplicated)} row(s) of raw Budget Allocation to Google BigQuery table {raw_table_budget}...")
+            logging.info(f"🔍 [INGEST] Uploading {len(ingest_df_deduplicated)} row(s) of raw Budget Allocation to Google BigQuery table {raw_table_budget}...")
             job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
             google_bigquery_client.load_table_from_dataframe(ingest_df_deduplicated, raw_table_budget, job_config=job_config).result()
             ingest_df_uploaded = ingest_df_deduplicated.copy()
-            print(f"✅ [INGEST] Successfully uploaded {len(ingest_df_uploaded)} row(s) of Budget Allocation to Google BigQuery table {raw_table_budget}.")
-            logging.info(f"✅ [INGEST] Successfully uploaded {len(ingest_df_uploaded)} row(s) of Budget Allocation to Google BigQuery table {raw_table_budget}.")
+            print(f"✅ [INGEST] Successfully uploaded {len(ingest_df_uploaded)} row(s) of raw Budget Allocation to Google BigQuery table {raw_table_budget}.")
+            logging.info(f"✅ [INGEST] Successfully uploaded {len(ingest_df_uploaded)} row(s) of raw Budget Allocation to Google BigQuery table {raw_table_budget}.")
             ingest_sections_status[ingest_section_name] = "succeed"
         except Exception as e:
             ingest_sections_status[ingest_section_name] = "failed"
-            print(f"❌ [INGEST] Failed to upload Budget Allocation to Google BigQuery table {raw_table_budget} due to {e}.")
-            logging.error(f"❌ [INGEST] Failed to upload Budget Allocation to Google BigQuery table {raw_table_budget} due to {e}.")
+            print(f"❌ [INGEST] Failed to upload raw Budget Allocation to Google BigQuery table {raw_table_budget} due to {e}.")
+            logging.error(f"❌ [INGEST] Failed to upload raw Budget Allocation to Google BigQuery table {raw_table_budget} due to {e}.")
         finally:
             ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
 
-    # 1.1.8. Summarize ingestion result(s) for Budget Allocation
+    # 1.1.9. Summarize ingestion results for Budget Allocation
     finally:
         ingest_time_elapsed = round(time.time() - ingest_time_start, 2)
         ingest_df_final = (ingest_df_uploaded.copy() if "ingest_df_uploaded" in locals() and not ingest_df_uploaded.empty else pd.DataFrame())
