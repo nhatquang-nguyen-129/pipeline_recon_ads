@@ -104,24 +104,6 @@ def update_budget_allocation(thang: str) -> None:
 
     try:
     
-    # 1.1.2. Convert YYYY-MM input to mMMYYYY ingest_name_sheet
-        update_section_name = "[UPDATE] Convert YYYY-MM input to mMMYYYY ingest_name_sheet"
-        update_section_start = time.time()
-        try:
-            print(f"🔄 [UPDATE] Converting {thang} from YYYY-MM format to mMMYYY with ingest_name_sheet {ingest_name_sheet} ...")
-            logging.info(f"🔄 [UPDATE] Converting {thang} from YYYY-MM format to mMMYYY with ingest_name_sheet {ingest_name_sheet} ...")
-            year, month = thang.split("-")
-            month = month.zfill(2)
-            ingest_name_sheet = f"m{month}{year}"
-            print(f"✅ [UPDATE] Successfully converted {thang} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
-            logging.info(f"✅ [UPDATE] Successfully converted {thang} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
-            update_sections_status[update_section_name] = "succeed"
-        except Exception as e:
-            print(f"❌ [UPDATE] Failed to convert {thang} from YYYY-MM format to mMMYYY ingest_name_sheet due to {e}.")
-            logging.error(f"❌ [UPDATE] Failed to convert {thang} from YYYY-MM format to mMMYYY ingest_name_sheet due to {e}.")
-            update_sections_status[update_section_name] = "failed"
-        finally:
-            update_sections_time[update_section_name] = round(time.time() - update_section_start, 2)
 
     # 1.1.4. Ingest monthly budget
     df_monthly = None
