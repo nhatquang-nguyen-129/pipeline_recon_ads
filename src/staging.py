@@ -39,7 +39,7 @@ import pandas as pd
 # Add Google Cloud modules for integration
 from google.cloud import bigquery
 
-# Add internal Budget module for handling
+# Add internal Budget Allocation modules for handling
 from src.schema import enforce_table_schema
 from src.enrich import enrich_budget_fields
 
