@@ -1,13 +1,13 @@
 """
 ===================================================================
-BUDGET SCHEMA MODULE
+BUDTE SCHEMA MODULE
 -------------------------------------------------------------------
 This module provides a centralized definition and management of  
-schema structures used throughout the Budget Allocation data 
-pipeline. It shares a consistent structure and data type alignment.  
+schema structures used throughout the Budget data pipeline.  
+It shares a consistent structure and data type alignment.  
 
 Its main purpose is to validate, enforce, and standardize field 
-structures across every pipeline stage to support reliable ETL
+structures across every pipeline stage to support reliable
 execution and seamless data integration.
 
 ✔️ Define and store expected field names and data types
@@ -16,11 +16,12 @@ execution and seamless data integration.
 ✔️ Automatically handle missing or mismatched columns  
 ✔️ Provide schema utilities for debugging and audit logging  
 
-⚠️ This module does *not* perform data fetching or transformation.  
+⚠️ This module does not perform data fetching or transformation.  
 It serves purely as a utility layer to support schema consistency  
-throughout the Budget Allocation ETL process.
+throughout the Budget ETL process.
 ===================================================================
 """
+
 # Add root directory to sys.path for absolute imports of internal modules
 import os
 import sys
@@ -32,10 +33,10 @@ import logging
 # Add Python time ultilities for integration
 import time
 
-# Add external Python Pandas libraries for integration
+# Add Python Pandas libraries for integration
 import pandas as pd
 
-# Add external Python NumPy libraries for integration
+# Add Python NumPy libraries for integration
 import numpy as np
 
 # 1. ENFORCE SCHEMA FOR GIVEN PYTHON DATAFRAME
@@ -45,7 +46,7 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
     print(f"🚀 [SCHEMA] Starting to enforce schema {schema_type_mapping} on Python DataFrame with {schema_df_input.shape[1]} column(s)...")
     logging.info(f"🚀 [SCHEMA] Starting to enforce schema {schema_type_mapping} on Python DataFrame with {schema_df_input.shape[1]} column(s)...")
     
-    # 1.1.1. Start timing the raw Budget Allocation enrichment
+    # 1.1.1. Start timing the Budget Allocation enrichment
     schema_time_start = time.time()
     schema_sections_status = {}
     schema_sections_time = {}
@@ -142,8 +143,8 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
         try:
             if schema_type_mapping not in schema_types_mapping:
                 schema_sections_status[schema_section_name] = "failed"
-                print(f"❌ [SCHEMA] Failed to validate schema type {schema_type_mapping} for Budget Allocation then enforcement is suspended.")
-                logging.error(f"❌ [SCHEMA] Failed to validate schema type {schema_type_mapping} for Budget Allocation then enforcement is suspended.")
+                print(f"❌ [SCHEMA] Failed to validate schema type {schema_type_mapping} for Budget Allocation then enforcement will be suspended.")
+                logging.error(f"❌ [SCHEMA] Failed to validate schema type {schema_type_mapping} for Budget Allocation then enforcement will be suspended.")
             else:
                 schema_columns_expected = schema_types_mapping[schema_type_mapping]
                 schema_sections_status[schema_section_name] = "succeed"
@@ -158,28 +159,30 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
         try:
             print(f"🔄 [SCHEMA] Enforcing schema for Budget Allocation with schema type {schema_type_mapping}...")
             logging.info(f"🔄 [SCHEMA] Enforcing schema for Budget Allocation with schema type {schema_type_mapping}...")
-            schema_df_enforced = schema_df_input.copy()                      
+            schema_df_enforced = schema_df_input.copy()            
             for schema_column_expected, schema_data_type in schema_columns_expected.items():
                 if schema_column_expected not in schema_df_enforced.columns: 
-                    schema_df_enforced[schema_column_expected] = pd.NA
+                    schema_df_enforced[schema_column_expected] = pd.NA               
                 try:
-                    if schema_data_type in [int, float]:
-                        schema_df_enforced[schema_column_expected] = schema_df_enforced[schema_column_expected].apply(
-                            lambda x: x if isinstance(x, (int, float, np.number, type(None))) 
-                            else (float(x.replace(",", "")) if isinstance(x, str) and x.replace(",", "").replace(".", "").isdigit() else np.nan)
-                        )
-                        schema_df_enforced[schema_column_expected] = schema_df_enforced[schema_column_expected].fillna(0).astype(schema_data_type)
+                    if schema_data_type == int:
+                        schema_df_enforced[schema_column_expected] = pd.to_numeric(
+                            schema_df_enforced[schema_column_expected].astype(str).str.replace(",", "."), errors="coerce"
+                        ).fillna(0).astype(int)
+                    elif schema_data_type == float:
+                        schema_df_enforced[schema_column_expected] = pd.to_numeric(
+                            schema_df_enforced[schema_column_expected].astype(str).str.replace(",", "."), errors="coerce"
+                        ).fillna(0.0).astype(float)
                     elif schema_data_type == "datetime64[ns, UTC]":
-                        schema_df_enforced[schema_column_expected] = pd.to_datetime(schema_df_enforced[schema_column_expected], errors="coerce")
-                        if schema_df_enforced[schema_column_expected].dt.tz is None:
-                            schema_df_enforced[schema_column_expected] = schema_df_enforced[schema_column_expected].dt.tz_localize("UTC")
-                        else:
-                            schema_df_enforced[schema_column_expected] = schema_df_enforced[schema_column_expected].dt.tz_convert("UTC")
+                        schema_df_enforced[schema_column_expected] = pd.to_datetime(
+                            schema_df_enforced[schema_column_expected], errors="coerce", utc=True
+                        )
+                    elif schema_data_type == str:
+                        schema_df_enforced[schema_column_expected] = schema_df_enforced[schema_column_expected].astype(str).fillna("")
                     else:
-                        schema_df_enforced[schema_column_expected] = schema_df_enforced[schema_column_expected].astype(schema_data_type, errors="ignore")
+                        schema_df_enforced[schema_column_expected] = schema_df_enforced[schema_column_expected]
                 except Exception as e:
-                    print(f"⚠️ [SCHEMA] Failed to coerce column {schema_column_expected} to {schema_data_type} due to {e}.")
-                    logging.warning(f"⚠️ [SCHEMA] Failed to coerce column {schema_column_expected} to {schema_data_type} due to {e}.")
+                    print(f"⚠️ [SCHEMA] Failed to coerce column {schema_column_expected} of Budget Allocation to {schema_data_type} due to {e}.")
+                    logging.warning(f"⚠️ [SCHEMA] Failed to coerce column {schema_column_expected} of Budget Allocation to {schema_data_type} due to {e}.")
             schema_df_enforced = schema_df_enforced[list(schema_columns_expected.keys())]       
             print(f"✅ [SCHEMA] Successfully enforced schema for Budget Allocation with {len(schema_df_enforced)} row(s) and schema type {schema_type_mapping}.")
             logging.info(f"✅ [SCHEMA] Successfully enforced schema for Budget Allocation with {len(schema_df_enforced)} row(s) and schema type {schema_type_mapping}.")
@@ -189,9 +192,9 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
             print(f"❌ [SCHEMA] Failed to enforce schema for Budget Allocation with schema type {schema_type_mapping} due to {e}.")
             logging.error(f"❌ [SCHEMA] Failed to enforce schema for Budget Allocation with schema type {schema_type_mapping} due to {e}.")
         finally:
-            schema_sections_time[schema_section_name] = round(time.time() - schema_section_start, 2)
+            schema_sections_time[schema_section_name] = round(time.time() - schema_section_start, 2)   
 
-    # 1.1.5. Summarize schema enforcement result(s) for Budget Allocation
+    # 1.1.5. Summarize schema enforcement results for Budget Allocation
     finally:
         schema_time_elapsed = round(time.time() - schema_time_start, 2)
         schema_df_final = schema_df_enforced.copy() if "schema_df_enforced" in locals() and not schema_df_enforced.empty else pd.DataFrame()        
