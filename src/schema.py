@@ -118,7 +118,6 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
             "enrich_budget_retail": int,
             "enrich_budget_customer": int,
             "enrich_budget_recruitment": int,
-            "enrich_budget_festival": int,
 
             # Enriched dimensions from table_id and specific to internal company structure
             "enrich_account_platform": str,

@@ -195,12 +195,11 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
             enrich_df_campaign["chuong_trinh"] = enrich_df_campaign["chuong_trinh"].astype(str).str.strip().str.upper()
             enrich_df_campaign["noi_dung"] = enrich_df_campaign["noi_dung"].astype(str).str.strip().str.upper()
             enrich_df_campaign["ngan_sach_thuc_chi"] = enrich_df_campaign["ngan_sach_ban_dau"] + enrich_df_campaign["ngan_sach_dieu_chinh"] + enrich_df_campaign["ngan_sach_bo_sung"]
-            enrich_df_campaign["ngan_sach_he_thong"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "KP") * enrich_df_campaign["ngan_sach_thuc_chi"]
-            enrich_df_campaign["ngan_sach_nha_cung_cap"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "NC") * enrich_df_campaign["ngan_sach_thuc_chi"]
-            enrich_df_campaign["ngan_sach_kinh_doanh"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "KD") * enrich_df_campaign["ngan_sach_thuc_chi"]
-            enrich_df_campaign["ngan_sach_tien_san"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "CS") * enrich_df_campaign["ngan_sach_thuc_chi"]
-            enrich_df_campaign["ngan_sach_tuyen_dung"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "HC") * enrich_df_campaign["ngan_sach_thuc_chi"]
-            enrich_df_campaign["ngan_sach_khac"] = enrich_df_campaign["ngan_sach_tien_san"] + enrich_df_campaign["ngan_sach_tuyen_dung"]
+            enrich_df_campaign["enrich_budget_marketing"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "KP") * enrich_df_campaign["ngan_sach_thuc_chi"]
+            enrich_df_campaign["enrich_budget_supplier"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "NC") * enrich_df_campaign["ngan_sach_thuc_chi"]
+            enrich_df_campaign["enrich_budget_retail"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "KD") * enrich_df_campaign["ngan_sach_thuc_chi"]
+            enrich_df_campaign["enrich_budget_customer"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "CS") * enrich_df_campaign["ngan_sach_thuc_chi"]
+            enrich_df_campaign["enrich_budget_recruitment"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "HC") * enrich_df_campaign["ngan_sach_thuc_chi"]
             print(f"✅ [ENRICH] Successfully enriched campaign fields for staging Budget Allocation with {len(enrich_df_campaign)} row(s).")
             logging.info(f"✅ [ENRICH] Successfully enriched campaign fields for staging Budget Allocation with {len(enrich_df_campaign)} row(s).")
         except Exception as e:
