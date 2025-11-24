@@ -115,6 +115,9 @@ def mart_budget_all() -> dict:
                 CREATE OR REPLACE TABLE `{mart_table_budget}`
                 CLUSTER BY thang, nhan_su, hang_muc AS
                 SELECT
+                    SAFE_CAST(enrich_account_name AS STRING) AS tai_khoan,
+                    SAFE_CAST(enrich_account_department AS STRING) AS phong_ban,
+                    SAFE_CAST(enrich_account_platform AS STRING) AS nen_tang,
                     ma_ngan_sach_cap_1,
                     ma_ngan_sach_cap_2,
                     hang_muc,
@@ -125,8 +128,8 @@ def mart_budget_all() -> dict:
                     thang,
                     thoi_gian_bat_dau,
                     thoi_gian_ket_thuc,
-                    tong_so_ngay_thuc_chay,
-                    tong_so_ngay_da_qua,
+                    SAFE_CAST(enrich_time_total AS INT) AS tong_so_ngay_thuc_chay,
+                    SAFE_CASE(enrich_time_passed AS INT) AS tong_so_ngay_da_qua,
                     ngan_sach_ban_dau,
                     ngan_sach_dieu_chinh,
                     ngan_sach_bo_sung,
