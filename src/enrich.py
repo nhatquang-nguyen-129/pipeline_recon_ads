@@ -222,8 +222,8 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
             )
             enrich_df_date["thoi_gian_bat_dau"] = pd.to_datetime(enrich_df_date.get("thoi_gian_bat_dau"), errors="coerce")
             enrich_df_date["thoi_gian_ket_thuc"] = pd.to_datetime(enrich_df_date.get("thoi_gian_ket_thuc"), errors="coerce")
-            enrich_df_date["tong_so_ngay_thuc_chay"] = (enrich_df_date["thoi_gian_ket_thuc"] - enrich_df_date["thoi_gian_bat_dau"]).dt.days
-            enrich_df_date["tong_so_ngay_da_qua"] = ((today - enrich_df_date["thoi_gian_bat_dau"]).dt.days.clip(lower=0))            
+            enrich_df_date["enrich_time_total"] = (enrich_df_date["thoi_gian_ket_thuc"] - enrich_df_date["thoi_gian_bat_dau"]).dt.days
+            enrich_df_date["enrich_time_passed"] = ((today - enrich_df_date["thoi_gian_bat_dau"]).dt.days.clip(lower=0))            
             print(f"✅ [ENRICH] Successfully enriched date fields for staging Budget Allocation with {len(enrich_df_date)} row(s).")
             logging.info(f"✅ [ENRICH] Successfully enriched date fields for staging Budget Allocation with {len(enrich_df_date)} row(s).")
             enrich_sections_status[enrich_section_name] = "succeed"
