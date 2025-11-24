@@ -4,7 +4,7 @@ BUDGET UPDATE MODULE
 ------------------------------------------------------------------
 This module performs incremental updates to Budget Allocation data 
 at the raw layer, providing an efficient mechanism for refreshing  
-recent or specific-date datasets without the need for full reloads.
+recent or specific datasets without the need for full reloads.
 
 By supporting targeted updates (per day, layer, or entity), it  
 enables faster turnaround for near-real-time dashboards and daily  
