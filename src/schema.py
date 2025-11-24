@@ -113,8 +113,6 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
             "ngan_sach_thuc_chi": int,
             
             # Enriched dimensions and specific to budget classfication
-            "enrich_time_total": int,
-            "enrich_time_passed": int,
             "enrich_budget_marketing": int,
             "enrich_budget_supplier": int,
             "enrich_budget_retail": int,
@@ -128,7 +126,9 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
             "enrich_account_name": str,
 
             # Standardized time columns
-            "last_updated_at": "datetime64[ns, UTC]"            
+            "enrich_time_total": int,
+            "enrich_time_passed": int,            
+            "last_updated_at": "datetime64[ns, UTC]",           
         }
     }
 
