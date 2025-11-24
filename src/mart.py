@@ -10,14 +10,14 @@ It serves as the final transformation stage, consolidating daily
 performance and cost metrics into analytics-ready BigQuery tables 
 optimized for reporting, dashboarding, and business analysis.
 
-✔️ Dynamically identifies all available Facebook Ads staging tables  
+✔️ Dynamically identifies all Budget Allocation staging tables  
 ✔️ Applies data transformation, standardization, and type enforcement  
 ✔️ Performs daily-level aggregation of campaign performance metrics  
 ✔️ Creates partitioned and clustered MART tables in Google BigQuery  
 ✔️ Ensures consistency and traceability across the data pipeline  
 
 ⚠️ This module is exclusively responsible for materialized layer  
-construction. It does not perform data ingestion, API fetching 
+construction*. It does not perform data ingestion, API fetching, 
 or enrichment tasks.
 ==================================================================
 """
@@ -111,12 +111,13 @@ def mart_budget_all() -> dict:
         mart_section_name = "[MART] Query all staging Budget Allocation table(s)"
         mart_section_start = time.time()    
         try:
-            query = f"""
-            where_clause = f"WHERE account = '{ACCOUNT}'"
-            query_specific = f"""
-                CREATE OR REPLACE TABLE `{mart_table_specific}` AS
+            mart_query_budget = f"""
+                CREATE OR REPLACE TABLE `{mart_table_budget}`
+                CLUSTER BY thang, nhan_su, hang_muc AS
                 SELECT
                     ma_ngan_sach_cap_1,
+                    ma_ngan_sach_cap_2,
+                    hang_muc,
                     chuong_trinh,
                     noi_dung,
                     nen_tang,
@@ -136,17 +137,57 @@ def mart_budget_all() -> dict:
                     ngan_sach_tien_san,
                     ngan_sach_tuyen_dung,
                     ngan_sach_khac
-                FROM `{staging_table}`
-                {where_clause}
+                FROM `{staging_table_budget}`
             """
-            print(f"🔄 [MART] Querying staging budget allocation table {staging_table} to build materialized table {mart_table_specific} for specific case(s)...")
-            logging.info(f"🔄 [MART] Querying staging budget allocation table {staging_table} to build materialized table {mart_table_specific} for specific case(s)...")
-            google_bigquery_client.query(query_specific).result()
-            count_specific = list(google_bigquery_client.query(
-                f"SELECT COUNT(1) AS row_count FROM `{mart_table_specific}`"
-            ).result())[0]["row_count"]
-            print(f"✅ [MART] Successfully (re)built materialized table {mart_table_specific} with {count_specific} row(s).")
-            logging.info(f"✅ [MART] Successfully (re)built materialized table {mart_table_specific} with {count_specific} row(s).")
-    except Exception as e:
-        print(f"❌ [MART] Failed to build materialized table(s) due to {e}.")
-        logging.error(f"❌ [MART] Failed to build materialized table(s) due to {e}.")
+            print(f"🔄 [MART] Querying staging Budget Allocation table {staging_table_budget} to create or replace materialized table...")
+            logging.info(f"🔄 [MART] Querying staging Budget Allocation table {staging_table_budget} to create or replace materialized table...")
+            google_bigquery_client.query(mart_query_budget).result()
+            mart_query_count = f"SELECT COUNT(1) AS row_count FROM `{mart_table_budget}`"
+            mart_rows_count = list(google_bigquery_client.query(mart_query_count).result())[0]["row_count"]
+            print(f"✅ [MART] Successfully created or replace materialized table {mart_table_budget} for Budget Allocation with {mart_rows_count} row(s).")
+            logging.info(f"✅ [MART] Successfully created or replace materialized table {mart_table_budget} for Budget Allocation with {mart_rows_count} row(s).")
+            mart_sections_status[mart_section_name] = "succeed"
+        except Exception as e:
+            mart_sections_status[mart_section_name] = "failed"
+            print(f"❌ [MART] Failed to create or replace materialized table for Budget Allocation due to {e}.")
+            logging.error(f"❌ [MART] Failed to create or replace materialized table for Budget Allocation due to {e}.")
+        finally:
+            mart_sections_time[mart_section_name] = round(time.time() - mart_section_start, 2)
+
+    # 1.1.5. Summarize materialization results for Budget Allocation
+    finally:
+        mart_time_elapsed = round(time.time() - mart_time_start, 2)
+        mart_sections_total = len(mart_sections_status) 
+        mart_sections_failed = [k for k, v in mart_sections_status.items() if v == "failed"] 
+        mart_sections_succeeded = [k for k, v in mart_sections_status.items() if v == "succeed"]
+        mart_sections_summary = list(dict.fromkeys(
+            list(mart_sections_status.keys()) +
+            list(mart_sections_time.keys())
+        ))
+        mart_sections_detail = {
+            mart_section_summary: {
+                "status": mart_sections_status.get(mart_section_summary, "unknown"),
+                "time": round(mart_sections_time.get(mart_section_summary, 0.0), 2),
+            }
+            for mart_section_summary in mart_sections_summary
+        }       
+        if len(mart_sections_failed) > 0:
+            print(f"❌ [MART] Failed to complete Budget Allocation materialization due to unsuccessful section(s) {', '.join(mart_sections_failed)}.")
+            logging.error(f"❌ [MART] Failed to complete Budget Allocation materialization due to unsuccessful section(s) {', '.join(mart_sections_failed)}.")
+            mart_status_final = "mart_failed_all"
+        else:
+            print(f"🏆 [MART] Successfully completed Budget Allocation materialization in {mart_time_elapsed}s.")
+            logging.info(f"🏆 [MART] Successfully completed Budget Allocation materialization in {mart_time_elapsed}s.")
+            mart_status_final = "mart_succeed_all"
+        mart_results_final = {
+            "mart_df_final": None,
+            "mart_status_final": mart_status_final,
+            "mart_summary_final": {
+                "mart_time_elapsed": mart_time_elapsed,
+                "mart_sections_total": mart_sections_total,
+                "mart_sections_succeed": mart_sections_succeeded,
+                "mart_sections_failed": mart_sections_failed,
+                "mart_sections_detail": mart_sections_detail,
+            },
+        }
+    return mart_results_final
