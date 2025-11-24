@@ -73,9 +73,9 @@ MODE = os.getenv("MODE")
 # 1. FETCH BUDGET ALLCATION
 
 # 1.1. Fetch Budget Allcation from Google Sheets
-def fetch_budget_allocation(thang: str) -> pd.DataFrame:
-    print(f"🚀 [FETCH] Starting to fetch budget allocation for month {thang}...")
-    logging.info(f"🚀 [FETCH] Starting to fetch budget allocation for month {thang}...")
+def fetch_budget_allocation(fetch_month_allocation: str) -> pd.DataFrame:
+    print(f"🚀 [FETCH] Starting to fetch budget allocation for month {fetch_month_allocation}...")
+    logging.info(f"🚀 [FETCH] Starting to fetch budget allocation for month {fetch_month_allocation}...")
 
     # 1.1.1. Start timing the Budget Allocation fetching
     fetch_time_start = time.time()   
@@ -90,17 +90,17 @@ def fetch_budget_allocation(thang: str) -> pd.DataFrame:
         fetch_section_name = "[FETCH] Convert YYYY-MM input to mMMYYYY fetch_name_sheet"
         fetch_section_start = time.time()
         try:
-            print(f"🔄 [FETCH] Converting {thang} from YYYY-MM format to mMMYYY...")
-            logging.info(f"🔄 [FETCH] Converting {thang} from YYYY-MM format to mMMYYY...")
-            year, month = thang.split("-")
+            print(f"🔄 [FETCH] Converting {fetch_month_allocation} from YYYY-MM format to mMMYYY...")
+            logging.info(f"🔄 [FETCH] Converting {fetch_month_allocation} from YYYY-MM format to mMMYYY...")
+            year, month = fetch_month_allocation.split("-")
             month = month.zfill(2)
             fetch_name_sheet = f"m{month}{year}"
-            print(f"✅ [FETCH] Successfully converted {thang} from YYYY-MM format to mMMYYYY with fetch_name_sheet {fetch_name_sheet}.")
-            logging.info(f"✅ [FETCH] Successfully converted {thang} from YYYY-MM format to mMMYYYY with fetch_name_sheet {fetch_name_sheet}.")
+            print(f"✅ [FETCH] Successfully converted {fetch_month_allocation} from YYYY-MM format to mMMYYYY with fetch_name_sheet {fetch_name_sheet}.")
+            logging.info(f"✅ [FETCH] Successfully converted {fetch_month_allocation} from YYYY-MM format to mMMYYYY with fetch_name_sheet {fetch_name_sheet}.")
             fetch_sections_status[fetch_section_name] = "succeed"
         except Exception as e:
-            print(f"❌ [FETCH] Failed to convert {thang} from YYYY-MM format to mMMYYY due to {e}.")
-            logging.error(f"❌ [FETCH] Failed to convert {thang} from YYYY-MM format to mMMYYY due to {e}.")
+            print(f"❌ [FETCH] Failed to convert {fetch_month_allocation} from YYYY-MM format to mMMYYY due to {e}.")
+            logging.error(f"❌ [FETCH] Failed to convert {fetch_month_allocation} from YYYY-MM format to mMMYYY due to {e}.")
             fetch_sections_status[fetch_section_name] = "failed"
         finally:
             fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)

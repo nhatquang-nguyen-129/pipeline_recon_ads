@@ -1,39 +1,40 @@
 """
 ==================================================================
-MAIN ENTRYPOINT
+BUDGET MAIN ENTRYPOINT
 ------------------------------------------------------------------
-This script serves as the unified CLI **controller** for triggering  
-ads data updates across multiple platforms (e.g., Facebook, Google),  
-based on command-line arguments and environment variables.
+This script serves as the unified CLI controller for triggering  
+ads data updates from Budget Allocation based on command-line 
+arguments and environment variables.
 
-It supports **incremental daily ingestion** for selected data layers  
-(e.g., campaign, ad) and allows flexible control over date ranges.
+It supports incremental daily ingestion for selected data layers  
+and allows flexible control over date ranges.
 
 ✔️ Dynamic routing to the correct update module based on PLATFORM  
 ✔️ CLI flags to select data layers and date range mode  
 ✔️ Shared logging and error handling across update jobs  
-✔️ Supports scheduled jobs or manual on-demand executions  
+✔️ Supports scheduled jobs or manual on-demand executions 
+✔️ Automatic update summary and execution timing for each step
 
-⚠️ This script does *not* contain data processing logic itself.  
-It simply delegates update tasks to platform-specific modules  
-(e.g., services.facebook.update, services.budget.update).
+⚠️ This script does not contain data processing logic itself.  
+It simply delegates update tasks to platform-specific modules .
 ==================================================================
 """
+
 # Add project root to sys.path to enable absolute imports
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
-# Add argparse to parse comman-line arguments
-import argparse
-
-# Add dynamic platform-specific modules
+# Add Python dynamic import ultilities for integration
 import importlib
 
-# Import datetime to calculate time
-from datetime import datetime, timedelta
+# Add Python datetime ultilities for integration
+from datetime import (
+    datetime, 
+    timedelta
+)
 
-# Add logging capability for tracking process execution and errors
+# Add Python logging ultilities for integration
 import logging
 
 # Get environment variable for Company
@@ -61,41 +62,43 @@ MODE = os.getenv("MODE")
 if not all([COMPANY, PLATFORM, ACCOUNT, LAYER, MODE]):
     raise EnvironmentError("❌ [MAIN] Missing required environment variables COMPANY/PLATFORM/ACCOUNT/LAYER/MODE.")
 
-# 1. DYNAMIC IMPORT MODULE BASED ON PLATFORM
+# 1. MAIN ENTRYPOINT CONTROLLER
+
+# 1.1. Validate input for main entrypoint function
+if PLATFORM != "budget":
+    raise ValueError("❌ [MAIN] Only 'budget' platform is supported in this script.")
 try:
-    update_module = importlib.import_module(f"src.update")
+    update_module_location = importlib.import_module(f"src.update")
 except ModuleNotFoundError:
     raise ImportError(f"❌ [MAIN] Platform '{PLATFORM}' is not supported so please ensure src/update.py exists.")
 
-# 1.2. Main entrypoint function
+# 1.2. Execution controller
 def main():
-    today = datetime.today()
-
-    # 1.2.1. PLATFORM = budget
+    update_day_today = datetime.today()
     if PLATFORM == "budget":
         try:
-            update_budget_allocation = update_module.update_budget_allocation
+            update_budget_allocation = update_module_location.update_budget_allocation
         except AttributeError:
             raise ImportError(f"❌ [MAIN] Budget update module must define 'update_budget_allocation'.")
         if MODE == "thismonth":
-            thang = today.strftime("%Y-%m")
+            main_month_updated = update_day_today.strftime("%Y-%m")
         elif MODE == "lastmonth":
-            first_day_this_month = today.replace(day=1)
-            last_day_last_month = first_day_this_month - timedelta(days=1)
-            thang = last_day_last_month.strftime("%Y-%m")
+            main_day_first = update_day_today.replace(day=1)
+            main_day_last = main_day_first - timedelta(days=1)
+            main_month_updated = main_day_last.strftime("%Y-%m")
         else:
             raise ValueError(f"⚠️ [MAIN] Unsupported mode {MODE} for budget and use 'thismonth' or 'lastmonth' instead.")
         if LAYER != "all":
             raise ValueError(f"⚠️ [MAIN] Unsupported layer {LAYER} for budget and use 'all' only.")
         try:
-            print(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {thang} month...")
-            logging.info(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {thang} month...")
-            update_budget_allocation(thang)
+            print(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {main_month_updated} month...")
+            logging.info(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {main_month_updated} month...")
+            update_budget_allocation(update_month_allocation=main_month_updated)
         except Exception as e:
-            print(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {thang} month due to {e}.")
-            logging.error(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {thang} month due to {e}.")
+            print(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {main_month_updated} month due to {e}.")
+            logging.error(f"❌ [MAIN] Failed to trigger update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {main_month_updated} month due to {e}.")
 
-# 1.3. Entrypoint guard to run main.py when this script is executed directly
+# 1.3. Execute main entrypoint function
 if __name__ == "__main__":
     try:
         main()
