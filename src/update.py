@@ -68,16 +68,16 @@ MODE = os.getenv("MODE")
 # 1. UPDATE BUDGET ALLOCATION FOR A GIVEN DATE RANGE
 
 # 1.1. Update budget allocation data for a given date range
-def update_budget_allocation(thang: str) -> None:
-    print(f"🚀 [UPDATE] Starting to update Budget Allocation for month {thang}...")
-    logging.info(f"🚀 [UPDATE] Starting to update Budget Allocation for month {thang}...")
+def update_budget_allocation(update_month_allocation: str) -> None:
+    print(f"🚀 [UPDATE] Starting to update Budget Allocation for month {update_month_allocation}...")
+    logging.info(f"🚀 [UPDATE] Starting to update Budget Allocation for month {update_month_allocation}...")
 
     # 1.1.1. Start timing TikTok Ads campaign insights update
     update_time_start = time.time()
     update_sections_status = {}
     update_sections_time = {}
-    print(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {thang} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
-    logging.info(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {thang} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    print(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {update_month_allocation} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    logging.info(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {update_month_allocation} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
 
     try:  
 
@@ -85,54 +85,68 @@ def update_budget_allocation(thang: str) -> None:
         update_section_name = "[UPDATE] Trigger to ingest Budget Allocation"
         update_section_start = time.time()
         try:
-            print(f"🔄 [UPDATE] Triggering to ingest Budget Allocation for month {thang}...")
-            logging.info(f"🔄 [UPDATE] Triggering to ingest Budget Allocation for month {thang}...")
-            ingest_results_insights = ingest_budget_allocation(start_date=start_date, end_date=end_date)
+            print(f"🔄 [UPDATE] Triggering to ingest Budget Allocation for month {update_month_allocation}...")
+            logging.info(f"🔄 [UPDATE] Triggering to ingest Budget Allocation for month {update_month_allocation}...")
+            ingest_results_insights = ingest_budget_allocation(ingest_month_allocation=update_month_allocation)
             ingest_df_insights = ingest_results_insights["ingest_df_final"]
             ingest_status_insights = ingest_results_insights["ingest_status_final"]
             ingest_summary_insights = ingest_results_insights["ingest_summary_final"]
-            updated_ids_campaign = set(ingest_df_insights["campaign_id"].dropna().unique())
             if ingest_status_insights == "ingest_succeed_all":
-                print(f"✅ [UPDATE] Successfully triggered Facebook Ads campaign insights ingestion from {start_date} to {end_date} with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
-                logging.info(f"✅ [UPDATE] Successfully triggered Facebook Ads campaign insights ingestion from {start_date} to {end_date} with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
+                print(f"✅ [UPDATE] Successfully triggered Budget Allocation ingestion for month {update_month_allocation} with {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
+                logging.info(f"✅ [UPDATE] Successfully triggered Budget Allocation ingestion for month {update_month_allocation} with {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
                 update_sections_status[update_section_name] = "succeed"
-            elif ingest_status_insights == "ingest_succeed_partial":
-                print(f"⚠️ [UPDATE] Partially triggered Facebook Ads campaign insights ingestion from {start_date} to {end_date} with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
-                logging.warning(f"⚠️ [UPDATE] Partially triggered Facebook Ads campaign insights ingestion from {start_date} to {end_date} with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
-                update_sections_status[update_section_name] = "partial"
             else:
                 update_sections_status[update_section_name] = "failed"
-                print(f"❌ [UPDATE] Failed to trigger Facebook Ads campaign insights ingestion from {start_date} to {end_date} with with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
-                logging.error(f"❌ [UPDATE] Failed to trigger Facebook Ads campaign insights ingestion from {start_date} to {end_date} with with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
+                print(f"❌ [UPDATE] Failed to trigger Budget Allocation ingestion for month {update_month_allocation} {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
+                logging.error(f"❌ [UPDATE] Failed to trigger Budget Allocation ingestion for month {update_month_allocation} {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
         finally:
             update_sections_time[update_section_name] = round(time.time() - update_section_start, 2)
 
-    # 1.1.6. Rebuild staging budget allocation table
-    has_monthly = df_monthly is not None and len(df_monthly) > 0
-    has_special = len(df_specials) > 0
-    if has_monthly or has_special:
-        print("🔄 [UPDATE] Triggering to rebuild staging budget allocation table...")
-        logging.info("🔄 [UPDATE] Triggering to rebuild staging budget allocation table...")            
+    # 1.1.3. Trigger to build staging Budget Allocation
+        update_section_name = "[UPDATE] Trigger to build staging Budget Allocation"
+        update_section_start = time.time()
         try:
-            staging_budget_allocation()
-        except Exception as e:
-            print(f"❌ [UPDATE] Failed to trigger staging table rebuild for budget allocation due to {e}.")
-            logging.error(f"❌ [UPDATE] Failed to trigger staging table rebuild for budget allocation due to {e}.")  
-    else:
-        print(f"⚠️ [UPDATE] No updates for {thang} in budget allocation then staging table rebuild is skipped.")
-        logging.warning(f"⚠️ [UPDATE] No updates for {thang} in budget allocation then staging table rebuild is skipped.")
+            print("🔄 [UPDATE] Triggering to create or overwrite staging Budget Allocation table...")
+            logging.info("🔄 [UPDATE] Triggering to create or overwrite staging Budget Allocation table...")
+            staging_results_campaign = staging_budget_allocation()
+            staging_status_campaign = staging_results_campaign["staging_status_final"]
+            staging_summary_campaign = staging_results_campaign["staging_summary_final"]
+            if staging_status_campaign == "staging_succeed_all":
+                print(f"✅ [UPDATE] Successfully triggered Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
+                logging.info(f"✅ [UPDATE] Successfully triggered Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
+                update_sections_status[update_section_name] = "succeed"
+            elif staging_status_campaign == "staging_failed_partial":
+                print(f"⚠️ [UPDATE] Partially triggered Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
+                logging.warning(f"⚠️ [UPDATE] Partially triggered Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
+                update_sections_status[update_section_name] = "partial"
+            else:
+                print(f"❌ [UPDATE] Failed to trigger Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
+                logging.error(f"❌ [UPDATE] Failed to trigger Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
+                update_sections_status[update_section_name] = "failed"
+        finally:
+            update_sections_time[update_section_name] = round(time.time() - update_section_start, 2)
 
-    # 1.1.7. Rebuild materialized budget allocation table
-    if has_monthly or has_special:
-        print("🔄 [UPDATE] Triggering to rebuild materialized budget allocation table...")
-        logging.info("🔄 [UPDATE] Triggering to rebuild materialized budget allocation table...")     
+    # 1.1.4. Trigger to materialize Budget Allocation
+        update_section_name = "[UPDATE] Trigger to materialize Budget Allocation"
+        update_section_start = time.time()
         try:
-            mart_budget_allocation()
-        except Exception as e:
-            print(f"❌ [UPDATE] Failed to trigger materialized table rebuild for budget allocation due to {e}.")
-            logging.error(f"❌ [UPDATE] Failed to trigger materialized table rebuild for budget allocation due to {e}.")          
-        
-    # 1.1.8. Measure the total execution time    
-    elapsed = time.time() - start_time
-    print(f"✅ [UPDATE] Completed budget allocation update for {thang} in {elapsed:.2f}s.")
-    logging.info(f"✅ [UPDATE] Completed budget allocation update for {thang} in {elapsed:.2f}s.")
+            if staging_status_campaign in ["staging_succeed_all", "staging_failed_partial"]:
+                print("🔄 [UPDATE] Triggering to build materialized Facebook Ads campaign performance table...")
+                logging.info("🔄 [UPDATE] Triggering to build materialized Facebook Ads campaign performance table...")               
+                mart_results_all = mart_budget_allocation()
+                mart_status_all = mart_results_all["mart_status_final"]
+                mart_summary_all = mart_results_all["mart_summary_final"]                
+                if mart_status_all == "mart_succeed_all":
+                    print(f"✅ [UPDATE] Successfully completed Facebook Ads campaign performance materialization in {mart_summary_all['mart_time_elapsed']}s.")
+                    logging.info(f"✅ [UPDATE] Successfully completed Facebook Ads campaign performance materialization in {mart_summary_all['mart_time_elapsed']}s.")
+                    update_sections_status[update_section_name] = "succeed"
+                elif mart_status_all == "mart_failed_all":
+                    print(f"❌ [UPDATE] Failed to complete Facebook Ads campaign performance materialization due to unsuccessful section(s) of {', '.join(mart_summary_all['mart_sections_failed']) if mart_summary_all['mart_sections_failed'] else 'unknown'}.")
+                    logging.error(f"❌ [UPDATE] Failed to complete Facebook Ads campaign performance materialization due to unsuccessful section(s) of {', '.join(mart_summary_all['mart_sections_failed']) if mart_summary_all['mart_sections_failed'] else 'unknown'}.")
+                    update_sections_status[update_section_name] = "failed"
+            else:
+                print("⚠️ [UPDATE] No data returned from Facebook Ads campaign insights staging then materialization is skipped.")
+                logging.warning("⚠️ [UPDATE] No data returned from Facebook Ads campaign insights staging then materialization is skipped.")
+                update_sections_status[update_section_name] = "failed"
+        finally:
+            update_sections_time[update_section_name] = round(time.time() - update_section_start, 2)

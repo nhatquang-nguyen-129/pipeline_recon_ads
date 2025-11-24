@@ -60,7 +60,7 @@ MODE = os.getenv("MODE")
 # 1. BUILD MONTHLY MATERIALIZED TABLE FOR BUDGET ALLOCATION
 
 # 1.1. Build materialized table for Budget Allocation by union all staging tables
-def mart_budget_all() -> dict:
+def mart_budget_allocation() -> dict:
     print(f"🚀 [MART] Starting to build materialized table for Budget Allocation...")
     logging.info(f"🚀 [MART] Starting to build materialized table for Budget Allocation...")
 
