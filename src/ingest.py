@@ -73,9 +73,9 @@ MODE = os.getenv("MODE")
 # 1. INGEST BUDGET ALLOCATION
 
 # 1.1. Ingest Budget Allocation to Google BigQuery
-def ingest_budget_allocation(thang: str) -> pd.DataFrame:
-    print(f"🚀 [INGEST] Starting to ingest Budget Allocation for month {thang}...")
-    logging.info(f"🚀 [INGEST] Starting to ingest Budget Allocation for month {thang}...")
+def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
+    print(f"🚀 [INGEST] Starting to ingest Budget Allocation for month {ingest_month_allocation}...")
+    logging.info(f"🚀 [INGEST] Starting to ingest Budget Allocation for month {ingest_month_allocation}...")
 
     # 1.1.1. Start timing Budget Allocation ingestion
     ingest_time_start = time.time()
@@ -90,17 +90,17 @@ def ingest_budget_allocation(thang: str) -> pd.DataFrame:
         ingest_section_name = "[INGEST] Convert YYYY-MM input to mMMYYYY ingest_name_sheet"
         ingest_section_start = time.time()
         try:
-            print(f"🔄 [INGEST] Converting {thang} from YYYY-MM format to mMMYYY...")
-            logging.info(f"🔄 [INGEST] Converting {thang} from YYYY-MM format to mMMYYY...")
-            year, month = thang.split("-")
+            print(f"🔄 [INGEST] Converting {ingest_month_allocation} from YYYY-MM format to mMMYYY...")
+            logging.info(f"🔄 [INGEST] Converting {ingest_month_allocation} from YYYY-MM format to mMMYYY...")
+            year, month = ingest_month_allocation.split("-")
             month = month.zfill(2)
             ingest_name_sheet = f"m{month}{year}"
-            print(f"✅ [INGEST] Successfully converted {thang} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
-            logging.info(f"✅ [INGEST] Successfully converted {thang} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
+            print(f"✅ [INGEST] Successfully converted {ingest_month_allocation} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
+            logging.info(f"✅ [INGEST] Successfully converted {ingest_month_allocation} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
             ingest_sections_status[ingest_section_name] = "succeed"
         except Exception as e:
-            print(f"❌ [INGEST] Failed to convert {thang} from YYYY-MM format to mMMYYY due to {e}.")
-            logging.error(f"❌ [INGEST] Failed to convert {thang} from YYYY-MM format to mMMYYY due to {e}.")
+            print(f"❌ [INGEST] Failed to convert {ingest_month_allocation} from YYYY-MM format to mMMYYY due to {e}.")
+            logging.error(f"❌ [INGEST] Failed to convert {ingest_month_allocation} from YYYY-MM format to mMMYYY due to {e}.")
             ingest_sections_status[ingest_section_name] = "failed"
         finally:
             ingest_sections_status[ingest_section_name] = round(time.time() - ingest_section_start, 2)
@@ -109,9 +109,9 @@ def ingest_budget_allocation(thang: str) -> pd.DataFrame:
         ingest_section_name = "[INGEST] Trigger to fetch Budget Allocation"
         ingest_section_start = time.time()        
         try:
-            print(f"🔁 [INGEST] Triggering to fetch Budget Allocation for month {thang}...")
-            logging.info(f"🔁 [INGEST] Triggering to fetch Budget Allocation for month {thang}...")
-            ingest_results_fetched = fetch_budget_allocation(thang=thang)
+            print(f"🔁 [INGEST] Triggering to fetch Budget Allocation for month {ingest_month_allocation}...")
+            logging.info(f"🔁 [INGEST] Triggering to fetch Budget Allocation for month {ingest_month_allocation}...")
+            ingest_results_fetched = fetch_budget_allocation(fetch_month_allocation=ingest_month_allocation)
             ingest_df_fetched = ingest_results_fetched["fetch_df_final"]
             ingest_status_fetched = ingest_results_fetched["fetch_status_final"]
             ingest_summary_fetched = ingest_results_fetched["fetch_summary_final"]

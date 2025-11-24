@@ -6,12 +6,12 @@ This module performs incremental updates to Budget Allocation data
 at the raw layer, providing an efficient mechanism for refreshing  
 recent or specific-date datasets without the need for full reloads.
 
-By supporting targeted updates (per month, layer or entity), it  
+By supporting targeted updates (per day, layer, or entity), it  
 enables faster turnaround for near-real-time dashboards and daily  
 data sync jobs while maintaining historical accuracy and integrity.
 
-✔️ Handles incremental data ingestion from the Google Sheets API
-✔️ Supports selective updates for campaign, adset, ad or creative   
+✔️ Handles incremental data ingestion from the GSpread API
+✔️ Supports selective updates for campaign, adset, ad or creative  
 ✔️ Preserves schema alignment with staging and MART layers  
 ✔️ Implements error handling and retry logic for partial failures  
 ✔️ Designed for integration in daily or on-demand sync pipelines  
@@ -30,29 +30,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.
 # Add logging capability for tracking process execution and errors
 import logging
 
-# Add Python Pandas library for data processing
-import pandas as pd
-
-# Add Google Authentication libraries for integration
-from google.api_core.exceptions import (
-    GoogleAPICallError,
-    Forbidden,
-    NotFound,
-    PermissionDenied, 
-)
-from google.auth import default
-from google.auth.exceptions import DefaultCredentialsError
-from google.auth.transport.requests import AuthorizedSession
-
-# Add Google API Core libraries for integration
-from google.api_core.exceptions import NotFound
-
-# Add Google Spreadsheets API libraries for integration
-import gspread
-from gspread.exceptions import SpreadsheetNotFound, WorksheetNotFound, APIError, GSpreadException
-
-# Add Google Secret Manager libraries for integration
-from google.cloud import secretmanager
 
 # Add Python "re" library for expression matching
 import re
@@ -102,36 +79,33 @@ def update_budget_allocation(thang: str) -> None:
     print(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {thang} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
     logging.info(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {thang} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
 
-    try:
-    
+    try:  
 
-    # 1.1.4. Ingest monthly budget
-    df_monthly = None
-    if monthly_sheets:
+    # 1.1.2. Trigger to ingest Budget Allocation
+        update_section_name = "[UPDATE] Trigger to ingest Budget Allocation"
+        update_section_start = time.time()
         try:
-            print(f"🔄 [UPDATE] Triggering to ingest monthly budget allocation sheet {worksheet_monthly}...")
-            logging.info(f"🔄 [UPDATE] Triggering to ingest monthly budget allocation sheet {worksheet_monthly}...")
-            df_monthly = ingest_budget_allocation(sheet_id, worksheet_monthly, thang) \
-                .query("thang == @thang")
-        except Exception as e:
-            print(f"❌ [UPDATE] Failed to trigger monthly budget allocation sheet {worksheet_monthly} due to {e}.")
-            logging.error(f"❌ [UPDATE] Failed to trigger monthly budget allocation sheet {worksheet_monthly} due to {e}.")
-    # 1.1.5. Ingest special budget
-    df_specials = []
-    for ws in special_sheets:
-        try:
-            print(f"🔄 [UPDATE] Triggering to ingest special budget allocation sheet {ws}...")
-            logging.info(f"🔄 [UPDATE] Triggering to ingest special budget allocation sheet {ws}...")            
-            df_special = ingest_budget_allocation(sheet_id, ws, thang)
-            df_special = df_special.query("thang == @thang")            
-            if len(df_special) > 0:
-                df_specials.append(df_special)
+            print(f"🔄 [UPDATE] Triggering to ingest Budget Allocation for month {thang}...")
+            logging.info(f"🔄 [UPDATE] Triggering to ingest Budget Allocation for month {thang}...")
+            ingest_results_insights = ingest_budget_allocation(start_date=start_date, end_date=end_date)
+            ingest_df_insights = ingest_results_insights["ingest_df_final"]
+            ingest_status_insights = ingest_results_insights["ingest_status_final"]
+            ingest_summary_insights = ingest_results_insights["ingest_summary_final"]
+            updated_ids_campaign = set(ingest_df_insights["campaign_id"].dropna().unique())
+            if ingest_status_insights == "ingest_succeed_all":
+                print(f"✅ [UPDATE] Successfully triggered Facebook Ads campaign insights ingestion from {start_date} to {end_date} with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
+                logging.info(f"✅ [UPDATE] Successfully triggered Facebook Ads campaign insights ingestion from {start_date} to {end_date} with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
+                update_sections_status[update_section_name] = "succeed"
+            elif ingest_status_insights == "ingest_succeed_partial":
+                print(f"⚠️ [UPDATE] Partially triggered Facebook Ads campaign insights ingestion from {start_date} to {end_date} with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
+                logging.warning(f"⚠️ [UPDATE] Partially triggered Facebook Ads campaign insights ingestion from {start_date} to {end_date} with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
+                update_sections_status[update_section_name] = "partial"
             else:
-                print(f"⚠️ [UPDATE] No rows matched 'thang' to {thang} in special sheet {ws} then ingestion is skipped.")
-                logging.warning(f"⚠️ [UPDATE] No rows matched 'thang' to {thang} in special sheet {ws} then ingestion is skipped.")        
-        except Exception as e:
-            print(f"❌ [UPDATE] Failed to trigger special budget allocation sheet {ws} ingestion due to {e}.")
-            logging.error(f"❌ [UPDATE] Failed to ingest special budget sheet {ws} due to {e}.")
+                update_sections_status[update_section_name] = "failed"
+                print(f"❌ [UPDATE] Failed to trigger Facebook Ads campaign insights ingestion from {start_date} to {end_date} with with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
+                logging.error(f"❌ [UPDATE] Failed to trigger Facebook Ads campaign insights ingestion from {start_date} to {end_date} with with {ingest_summary_insights['ingest_dates_output']}/{ingest_summary_insights['ingest_dates_input']} ingested day(s) and {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
+        finally:
+            update_sections_time[update_section_name] = round(time.time() - update_section_start, 2)
 
     # 1.1.6. Rebuild staging budget allocation table
     has_monthly = df_monthly is not None and len(df_monthly) > 0
