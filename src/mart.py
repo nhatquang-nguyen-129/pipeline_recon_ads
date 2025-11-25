@@ -130,7 +130,7 @@ def mart_budget_allocation() -> dict:
                     SAFE_CAST(raw_date_end AS TIMESTAMP) AS thoi_gian_ket_thuc,
                     SAFE_CAST(enrich_time_total AS INT) AS tong_so_ngay_thuc_chay,
                     SAFE_CAST(enrich_time_passed AS INT) AS tong_so_ngay_da_qua,
-                    SAFE_CAST(raw_budget_inital AS INT) AS ngan_sach_ban_dau,
+                    SAFE_CAST(raw_budget_initial AS INT) AS ngan_sach_ban_dau,
                     SAFE_CAST(raw_budget_adjusted AS INT) AS ngan_sach_dieu_chinh,
                     SAFE_CAST(raw_budget_additiona AS INT) AS ngan_sach_bo_sung,
                     SAFE_CAST(raw_budget_actual AS INT) AS ngan_sach_thuc_chi,
