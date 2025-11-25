@@ -184,7 +184,7 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
         ingest_section_start = time.time()
         try:
             ingest_df_deduplicated = ingest_df_enforced.drop_duplicates()           
-            table_clusters_defined = ["thang"]
+            table_clusters_defined = ["raw_date_month"]
             table_clusters_filtered = []
             table_schemas_defined = []
             try:
@@ -234,36 +234,41 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
             else:
                 print(f"🔄 [INGEST] Found raw Budget Allocation table {raw_table_budget} then existing row(s) deletion will be proceeding...")
                 logging.info(f"🔄 [INGEST] Found raw Budget Allocation table {raw_table_budget} then existing row(s) deletion will be proceeding...")
-                unique_keys = ingest_df_deduplicated[["thang"]].dropna().drop_duplicates()
+                unique_keys = ingest_df_deduplicated[["raw_date_month"]].dropna().drop_duplicates()
                 if not unique_keys.empty:
                     temp_table_id = f"{PROJECT}.{raw_dataset}.temp_table_campaign_metadata_delete_keys_{uuid.uuid4().hex[:8]}"
-                    job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
-                    google_bigquery_client.load_table_from_dataframe(unique_keys, temp_table_id, job_config=job_config).result()
-                    join_condition = " AND ".join([
+                    ingest_job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
+                    google_bigquery_client.load_table_from_dataframe(unique_keys, temp_table_id, job_config=ingest_job_config).result()
+                    ingest_job_condition = " AND ".join([
                         f"CAST(main.{col} AS STRING) = CAST(temp.{col} AS STRING)"
-                        for col in ["thang"]
+                        for col in ["raw_date_month"]
                     ])
-                    delete_query = f"""
+                    ingest_query_delete = f"""
                         DELETE FROM `{raw_table_budget}` AS main
                         WHERE EXISTS (
                             SELECT 1 FROM `{temp_table_id}` AS temp
-                            WHERE {join_condition}
+                            WHERE {ingest_job_condition}
                         )
                     """
-                    result = google_bigquery_client.query(delete_query).result()
-                    google_bigquery_client.delete_table(temp_table_id, not_found_ok=True)
-                    deleted_rows = result.num_dml_affected_rows
-                    print(f"✅ [INGEST] Successfully deleted {deleted_rows} existing row(s) of raw Budget Allocation table {raw_table_budget}.")
-                    logging.info(f"✅ [INGEST] Successfully deleted {deleted_rows} existing row(s) of raw Budget Allocation table {raw_table_budget}.")
+                    ingest_result_deleted = google_bigquery_client.query(ingest_query_delete).result()
+                    ingest_rows_deleted = ingest_result_deleted.num_dml_affected_rows
                 else:
-                    print(f"⚠️ [INGEST] No unique 'thang' key found in raw Budget Allocation table {raw_table_budget} then existing row(s) deletion is skipped.")
-                    logging.warning(f"⚠️ [INGEST] No unique 'thang' key found in raw Budget Allocation table {raw_table_budget} then existing row(s) deletion is skipped.")
+                    print(f"⚠️ [INGEST] No unique 'raw_date_month' key found in raw Budget Allocation table {raw_table_budget} then existing row(s) deletion is skipped.")
+                    logging.warning(f"⚠️ [INGEST] No unique 'raw_date_month' key found in raw Budget Allocation table {raw_table_budget} then existing row(s) deletion is skipped.")
             ingest_sections_status[ingest_section_name] = "succeed"
         except Exception as e:
             ingest_sections_status[ingest_section_name] = "failed"
             print(f"❌ [INGEST] Failed to delete existing row(s) or create new table {raw_table_budget} if it not exist for raw Budget Allocation due to {e}.")
             logging.error(f"❌ [INGEST] Failed to delete existing row(s) or create new table {raw_table_budget} if it not exist for raw Budget Allocation due to {e}.")
         finally:
+            if temp_table_id:
+                try:
+                    google_bigquery_client.delete_table(temp_table_id, not_found_ok=True)
+                    print(f"✅ [INGEST] Successfully deleted {ingest_rows_deleted} existing row(s) of raw Budget Allocation table {raw_table_budget} and temporary table {temp_table_id} was deleted.")
+                    logging.info(f"✅ [INGEST] Successfully deleted {ingest_rows_deleted} existing row(s) of raw Budget Allocation table {raw_table_budget} and temporary table {temp_table_id} was deleted.")
+                except Exception as e:
+                    print(f"⚠️ [INGEST] Failed to delete temporary table {temp_table_id} after deleted existing row(s) of raw Budget Allocation due to {e}.")
+                    logging.warning(f"⚠️ [INGEST] Failed to delete temporary table {temp_table_id} after deleted existing row(s) of raw Budget Allocation due to {e}.")
             ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
 
     # 1.1.8. Upload Budget Allocation to Google BigQuery
