@@ -153,7 +153,7 @@ def update_budget_allocation(update_month_allocation: str) -> None:
         summary_map = {
             "[UPDATE] Trigger to ingest Budget Allocation": "ingest_results_allocation",
             "[UPDATE] Trigger to build staging Budget Allocation": "staging_results_allocation",
-            "[UPDATE] Trigger to materialize Facebook Ads campaign performance table": "mart_results_allocation",
+            "[UPDATE] Trigger to materialize Budget Allocation": "mart_results_allocation",
         }
         locals_dict = locals()
         for update_step_name, update_step_status in update_sections_status.items():
