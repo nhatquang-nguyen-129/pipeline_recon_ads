@@ -36,9 +36,6 @@ import time
 # Add Python Pandas libraries for integration
 import pandas as pd
 
-# Add Python NumPy libraries for integration
-import numpy as np
-
 # 1. ENFORCE SCHEMA FOR GIVEN PYTHON DATAFRAME
 
 # 1.1. Enforce that the given DataFrame contains all required columns with correct datatypes
