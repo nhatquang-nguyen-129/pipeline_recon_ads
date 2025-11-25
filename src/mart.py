@@ -113,7 +113,7 @@ def mart_budget_allocation() -> dict:
         try:
             mart_query_budget = f"""
                 CREATE OR REPLACE TABLE `{mart_table_budget}`
-                CLUSTER BY thang, nhan_su, hang_muc AS
+                CLUSTER BY thang, ma_ngan_sach_cap_1, hang_muc AS
                 SELECT
                     SAFE_CAST(enrich_account_name AS STRING) AS tai_khoan,
                     SAFE_CAST(enrich_account_department AS STRING) AS phong_ban,
@@ -123,7 +123,7 @@ def mart_budget_allocation() -> dict:
                     SAFE_CAST(raw_program_track AS STRING) AS hang_muc,
                     SAFE_CAST(raw_program_group AS STRING) AS chuong_trinh,
                     SAFE_CAST(raw_program_type AS STRING) AS noi_dung,
-                    SAFE_CAST(raw_budget_platform AS STRING) AS nen_tang,
+                    SAFE_CAST(raw_budget_platform AS STRING) AS kenh,
                     SAFE_CAST(raw_budget_objective AS STRING) AS hinh_thuc,
                     SAFE_CAST(raw_date_month AS STRING) AS thang,
                     SAFE_CAST(raw_date_start AS TIMESTAMP) AS thoi_gian_bat_dau,
@@ -132,8 +132,8 @@ def mart_budget_allocation() -> dict:
                     SAFE_CAST(enrich_time_passed AS INT) AS tong_so_ngay_da_qua,
                     SAFE_CAST(raw_budget_initial AS INT) AS ngan_sach_ban_dau,
                     SAFE_CAST(raw_budget_adjusted AS INT) AS ngan_sach_dieu_chinh,
-                    SAFE_CAST(raw_budget_additiona AS INT) AS ngan_sach_bo_sung,
-                    SAFE_CAST(raw_budget_actual AS INT) AS ngan_sach_thuc_chi,
+                    SAFE_CAST(raw_budget_additional AS INT) AS ngan_sach_bo_sung,
+                    SAFE_CAST(enrich_budget_actual AS INT) AS ngan_sach_thuc_chi,
                     SAFE_CAST(enrich_budget_marketing AS INT) AS ngan_sach_he_thong,
                     SAFE_CAST(enrich_budget_supplier AS INT) AS ngan_sach_nha_cung_cap,
                     SAFE_CAST(enrich_budget_retail AS INT) AS ngan_sach_kinh_doanh,
