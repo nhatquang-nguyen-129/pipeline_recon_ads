@@ -212,7 +212,7 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
     # 1.1.7. Summarize enrichment results for staging Budget Allocation
     finally:
         enrich_time_elapsed = round(time.time() - enrich_time_start, 2)
-        enrich_df_final = enrich_df_other.copy() if not enrich_df_other.empty else pd.DataFrame()
+        enrich_df_final = enrich_df_date.copy() if not enrich_df_date.empty else pd.DataFrame()
         enrich_sections_total = len(enrich_sections_status)
         enrich_sections_failed = [k for k, v in enrich_sections_status.items() if v == "failed"]
         enrich_sections_succeeded = [k for k, v in enrich_sections_status.items() if v == "succeed"]

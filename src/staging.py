@@ -322,7 +322,7 @@ def staging_budget_allocation() -> dict:
                             field="date"
                         )
                     if table_clusters_effective:
-                        staging_job_config["clustering_fields"] = table_clusters_defined
+                        staging_job_config["clustering_fields"] = table_clusters_effective
                     staging_job_config = bigquery.LoadJobConfig(**staging_job_config)
                     staging_job_load = google_bigquery_client.load_table_from_dataframe(
                         staging_df_enforced,
