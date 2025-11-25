@@ -251,7 +251,8 @@ def staging_budget_allocation() -> dict:
         staging_section_name = "[STAGING] Create new staging Budget Allocation table"
         staging_section_start = time.time()     
         staging_df_deduplicated = staging_df_enforced.drop_duplicates()
-        table_clusters_filtered = []
+        table_clusters_defined = ["raw_budget_group", "raw_category_group", "raw_program_group"]
+        table_partition_defined = "date"
         table_schemas_defined = []
         try:
             try:
@@ -277,19 +278,18 @@ def staging_budget_allocation() -> dict:
                         google_bigquery_type = "STRING"
                     table_schemas_defined.append(bigquery.SchemaField(col, google_bigquery_type))
                 table_configuration_defined = bigquery.Table(staging_table_budget, schema=table_schemas_defined)
-                table_partition_effective = "date" if "date" in staging_df_deduplicated.columns else None
+                table_partition_effective = table_partition_defined if table_partition_defined in staging_df_deduplicated.columns else None
                 if table_partition_effective:
                     table_configuration_defined.time_partitioning = bigquery.TimePartitioning(
                         type_=bigquery.TimePartitioningType.DAY,
                         field=table_partition_effective
                     )
-                table_clusters_defined = ["chuong_trinh", "ma_ngan_sach_cap_1", "nhan_su"]
-                table_clusters_filtered = [f for f in table_clusters_defined if f in staging_df_deduplicated.columns]
-                if table_clusters_filtered:  
-                    table_configuration_defined.clustering_fields = table_clusters_filtered  
+                table_clusters_effective = [table_cluster_defined for table_cluster_defined in table_clusters_defined if table_cluster_defined in staging_df_deduplicated.columns]
+                if table_clusters_effective:
+                        table_configuration_defined.clustering_fields = table_clusters_effective
                 try:
-                    print(f"🔍 [STAGING] Creating staging Budget Allocation table with defined name {staging_table_budget} and partition on {table_partition_effective}...")
-                    logging.info(f"🔍 [STAGING] Creating staging Budget Allocation table with defined name {staging_table_budget} and partition on {table_partition_effective}...")
+                    print(f"🔍 [STAGING] Creating staging Budget Allocation table with defined name {staging_table_budget} which partitioned on {table_partition_effective} and clustered on {table_clusters_effective}...")
+                    logging.info(f"🔍 [STAGING] Creating staging Budget Allocation table with defined name {staging_table_budget} which partitioned on {table_partition_effective} and clustered on {table_clusters_effective}...")
                     table_metadata_defined = google_bigquery_client.create_table(table_configuration_defined)
                     print(f"✅ [STAGING] Successfully created staging Budget Allocation table with actual name {table_metadata_defined.full_table_id}.")
                     logging.info(f"✅ [STAGING] Successfully created staging Budget Allocation table with actual name {table_metadata_defined.full_table_id}.")
@@ -298,7 +298,6 @@ def staging_budget_allocation() -> dict:
                     staging_sections_status[staging_section_name] = "failed"
                     print(f"❌ [STAGING] Failed to create staging Budget Allocation table {staging_table_budget} due to {e}.")
                     logging.error(f"❌ [STAGING] Failed to create staging Budget Allocation table {staging_table_budget} due to {e}.")
-                    raise RuntimeError(f"❌ [STAGING] Failed to create staging Budget Allocation table {staging_table_budget} due to {e}.") from e
             else:
                 print(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} already exists then creation will be skipped.")
                 logging.info(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} already exists then creation will be skipped.")
@@ -308,26 +307,29 @@ def staging_budget_allocation() -> dict:
 
     # 1.1.10. Upload staging Budget Allocation
         staging_section_name = "[STAGING] Upload staging Budget Allocation"
-        staging_section_start = time.time()        
+        staging_section_start = time.time()
         try:            
             if not staging_table_exists:
                 try: 
                     print(f"🔍 [STAGING] Uploading {len(staging_df_enforced)} row(s) of staging Budget Allocation to new Google BigQuery table {table_metadata_defined.full_table_id}...")
                     logging.warning(f"🔍 [STAGING] Uploading {len(staging_df_enforced)} row(s) of staging Budget Allocation to new Google BigQuery table {table_metadata_defined.full_table_id}...")
-                    job_config = bigquery.LoadJobConfig(
-                        write_disposition="WRITE_APPEND",
-                        time_partitioning=bigquery.TimePartitioning(
+                    staging_job_config = {
+                        "write_disposition": "WRITE_APPEND"
+                    }
+                    if table_partition_effective:
+                        staging_job_config["time_partitioning"] = bigquery.TimePartitioning(
                             type_=bigquery.TimePartitioningType.DAY,
                             field="date"
-                        ),
-                        clustering_fields=table_clusters_filtered if table_clusters_filtered else None
-                    )
-                    load_job = google_bigquery_client.load_table_from_dataframe(
+                        )
+                    if table_clusters_effective:
+                        staging_job_config["clustering_fields"] = table_clusters_defined
+                    staging_job_config = bigquery.LoadJobConfig(**staging_job_config)
+                    staging_job_load = google_bigquery_client.load_table_from_dataframe(
                         staging_df_enforced,
-                        staging_table_budget, 
-                        job_config=job_config
+                        staging_table_budget,
+                        job_config=staging_job_config
                     )
-                    load_job.result()
+                    staging_job_load.result()
                     staging_df_uploaded = staging_df_enforced.copy()
                     print(f"✅ [STAGING] Successfully uploaded {len(staging_df_uploaded)} row(s) of staging Budget Allocation to new Google BigQuery table {table_metadata_defined.full_table_id}.")
                     logging.info(f"✅ [STAGING] Successfully uploaded {len(staging_df_uploaded)} row(s) of staging Budget Allocation to new Google BigQuery table {table_metadata_defined.full_table_id}.")
@@ -341,15 +343,15 @@ def staging_budget_allocation() -> dict:
                 try:
                     print(f"🔍 [STAGING] Found existing Google BigQuery table {staging_table_budget} and {len(staging_df_enforced)} row(s) of staging Budget Allocation will be overwritten...")
                     logging.warning(f"🔍 [STAGING] Found existing Google BigQuery table {staging_table_budget} and {len(staging_df_enforced)} row(s) of staging Budget Allocation will be overwritten...")
-                    job_config = bigquery.LoadJobConfig(
+                    staging_job_config = bigquery.LoadJobConfig(
                         write_disposition="WRITE_TRUNCATE",
                     )
-                    load_job = google_bigquery_client.load_table_from_dataframe(
+                    staging_job_load = google_bigquery_client.load_table_from_dataframe(
                         staging_df_enforced,
                         staging_table_budget, 
-                        job_config=job_config
+                        job_config=staging_job_config
                     )
-                    load_job.result()
+                    staging_job_load.result()
                     staging_df_uploaded = staging_df_enforced.copy()
                     print(f"✅ [STAGING] Successfully overwrote {len(staging_df_uploaded)} row(s) of staging Budget Allocation to existing Google BigQuery table {staging_table_budget}.")
                     logging.info(f"✅ [STAGING] Successfully overwrote {len(staging_df_uploaded)} row(s) of staging Budget Allocation to existing Google BigQuery table {staging_table_budget}.")
