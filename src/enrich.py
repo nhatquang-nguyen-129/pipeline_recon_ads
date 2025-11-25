@@ -170,11 +170,11 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
             logging.info(f"🔍 [ENRICH] Enriching campaign fields for staging Budget Allocation with {len(enrich_df_table)} row(s)...")
             enrich_df_campaign = enrich_df_table.copy()
             enrich_df_campaign["enrich_budget_actual"] = enrich_df_campaign["raw_budget_initial"] + enrich_df_campaign["raw_budget_adjusted"] + enrich_df_campaign["raw_budget_additional"]
-            enrich_df_campaign["enrich_budget_marketing"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "KP") * enrich_df_campaign["ngan_sach_thuc_chi"]
-            enrich_df_campaign["enrich_budget_supplier"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "NC") * enrich_df_campaign["ngan_sach_thuc_chi"]
-            enrich_df_campaign["enrich_budget_retail"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "KD") * enrich_df_campaign["ngan_sach_thuc_chi"]
-            enrich_df_campaign["enrich_budget_customer"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "CS") * enrich_df_campaign["ngan_sach_thuc_chi"]
-            enrich_df_campaign["enrich_budget_recruitment"] = (enrich_df_campaign["ma_ngan_sach_cap_1"] == "HC") * enrich_df_campaign["ngan_sach_thuc_chi"]
+            enrich_df_campaign["enrich_budget_marketing"] = (enrich_df_campaign["raw_budget_group"] == "KP") * enrich_df_campaign["enrich_budget_actual"]
+            enrich_df_campaign["enrich_budget_supplier"] = (enrich_df_campaign["raw_budget_group"] == "NC") * enrich_df_campaign["enrich_budget_actual"]
+            enrich_df_campaign["enrich_budget_retail"] = (enrich_df_campaign["raw_budget_group"] == "KD") * enrich_df_campaign["enrich_budget_actual"]
+            enrich_df_campaign["enrich_budget_customer"] = (enrich_df_campaign["raw_budget_group"] == "CS") * enrich_df_campaign["enrich_budget_actual"]
+            enrich_df_campaign["enrich_budget_recruitment"] = (enrich_df_campaign["raw_budget_group"] == "HC") * enrich_df_campaign["enrich_budget_actual"]
             print(f"✅ [ENRICH] Successfully enriched campaign fields for staging Budget Allocation with {len(enrich_df_campaign)} row(s).")
             logging.info(f"✅ [ENRICH] Successfully enriched campaign fields for staging Budget Allocation with {len(enrich_df_campaign)} row(s).")
         except Exception as e:
