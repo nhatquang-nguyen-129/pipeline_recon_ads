@@ -187,6 +187,7 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
             table_clusters_defined = ["raw_date_month"]
             table_clusters_filtered = []
             table_schemas_defined = []
+            temp_table_id = None
             try:
                 print(f"🔍 [INGEST] Checking raw Budget Allocation table {raw_table_budget} existence...")
                 logging.info(f"🔍 [INGEST] Checking raw Budget Allocation table {raw_table_budget} existence...")
@@ -261,7 +262,7 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
             print(f"❌ [INGEST] Failed to delete existing row(s) or create new table {raw_table_budget} if it not exist for raw Budget Allocation due to {e}.")
             logging.error(f"❌ [INGEST] Failed to delete existing row(s) or create new table {raw_table_budget} if it not exist for raw Budget Allocation due to {e}.")
         finally:
-            if temp_table_id:
+            if temp_table_id is not None:
                 try:
                     google_bigquery_client.delete_table(temp_table_id, not_found_ok=True)
                     print(f"✅ [INGEST] Successfully deleted {ingest_rows_deleted} existing row(s) of raw Budget Allocation table {raw_table_budget} and temporary table {temp_table_id} was deleted.")
