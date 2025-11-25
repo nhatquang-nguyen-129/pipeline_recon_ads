@@ -17,7 +17,7 @@ optimized for reporting, dashboarding, and business analysis.
 ✔️ Ensures consistency and traceability across the data pipeline  
 
 ⚠️ This module is exclusively responsible for materialized layer  
-construction*. It does not perform data ingestion, API fetching, 
+construction. It does not perform data ingestion, API fetching, 
 or enrichment tasks.
 ==================================================================
 """
@@ -118,28 +118,27 @@ def mart_budget_allocation() -> dict:
                     SAFE_CAST(enrich_account_name AS STRING) AS tai_khoan,
                     SAFE_CAST(enrich_account_department AS STRING) AS phong_ban,
                     SAFE_CAST(enrich_account_platform AS STRING) AS nen_tang,
-                    ma_ngan_sach_cap_1,
-                    ma_ngan_sach_cap_2,
-                    hang_muc,
-                    chuong_trinh,
-                    noi_dung,
-                    nen_tang,
-                    hinh_thuc,
-                    thang,
-                    thoi_gian_bat_dau,
-                    thoi_gian_ket_thuc,
+                    SAFE_CAST(raw_budget_group AS STRING) AS ma_ngan_sach_cap_1,
+                    SAFE_CAST(raw_budget_type AS STRING) AS ma_ngan_sach_cap_2,
+                    SAFE_CAST(raw_program_track AS STRING) AS hang_muc,
+                    SAFE_CAST(raw_program_group AS STRING) AS chuong_trinh,
+                    SAFE_CAST(raw_program_type AS STRING) AS noi_dung,
+                    SAFE_CAST(raw_budget_platform AS STRING) AS nen_tang,
+                    SAFE_CAST(raw_budget_objective AS STRING) AS hinh_thuc,
+                    SAFE_CAST(raw_date_month AS STRING) AS thang,
+                    SAFE_CAST(raw_date_start AS TIMESTAMP) AS thoi_gian_bat_dau,
+                    SAFE_CAST(raw_date_end AS TIMESTAMP) AS thoi_gian_ket_thuc,
                     SAFE_CAST(enrich_time_total AS INT) AS tong_so_ngay_thuc_chay,
-                    SAFE_CASE(enrich_time_passed AS INT) AS tong_so_ngay_da_qua,
-                    ngan_sach_ban_dau,
-                    ngan_sach_dieu_chinh,
-                    ngan_sach_bo_sung,
-                    ngan_sach_thuc_chi,
-                    ngan_sach_he_thong,
-                    ngan_sach_nha_cung_cap,
-                    ngan_sach_kinh_doanh,
-                    ngan_sach_tien_san,
-                    ngan_sach_tuyen_dung,
-                    ngan_sach_khac
+                    SAFE_CAST(enrich_time_passed AS INT) AS tong_so_ngay_da_qua,
+                    SAFE_CAST(raw_budget_inital AS INT) AS ngan_sach_ban_dau,
+                    SAFE_CAST(raw_budget_adjusted AS INT) AS ngan_sach_dieu_chinh,
+                    SAFE_CAST(raw_budget_additiona AS INT) AS ngan_sach_bo_sung,
+                    SAFE_CAST(raw_budget_actual AS INT) AS ngan_sach_thuc_chi,
+                    SAFE_CAST(enrich_budget_marketing AS INT) AS ngan_sach_he_thong,
+                    SAFE_CAST(enrich_budget_supplier AS INT) AS ngan_sach_nha_cung_cap,
+                    SAFE_CAST(enrich_budget_retail AS INT) AS ngan_sach_kinh_doanh,
+                    SAFE_CAST(enrich_budget_customer AS INT) AS ngan_sach_tien_san,
+                    SAFE_CAST(enrich_budget_recruitment AS INT) AS ngan_sach_tuyen_dung,
                 FROM `{staging_table_budget}`
             """
             print(f"🔄 [MART] Querying staging Budget Allocation table {staging_table_budget} to create or replace materialized table...")
