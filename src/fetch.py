@@ -2,23 +2,23 @@
 ==================================================================
 BUDGET FETCHING MODULE
 ------------------------------------------------------------------
-This module handles direct, authenticated access to predefined 
-Google Sheets sources, serving as the unified interface to 
-retrieve marketing budget allocations across different scopes.
+This module handles direct, authenticated data retrievel from 
+predefined Google Sheets sources, consolidating all fetching logic 
+into a unified, maintainable structure for ingestion.
 
-It enables structured, centralized logic for reading and 
-normalizing budget data by category intended to be used as part 
-of the Budget Allocation ETL pipeline's extraction layer.
+It ensures reliable access to Budget Allocation data with controlled 
+rate limits, standardized field mapping, and structured outputs for 
+downstream enrichment and transformation stages.
 
-✔️ Authenticates securely via Service Account credentials  
-✔️ Loads budget data from configured Google Sheets tabs  
-✔️ Maps sheet-to-category via hardcoded internal mapping  
-✔️ Returns clean pandas DataFrames for further processing
-✔️ Logs detailed runtime information for monitoring
+✔️ Authenticates securely via Google Drive/Spreadsheets credentials  
+✔️ Fetches Budget Allocation data via authenticated API calls  
+✔️ Handles pagination, rate limiting and error retries automatically
+✔️ Returns normalized and schema-ready DataFrames for processing  
+✔️ Logs detailed runtime information for monitoring and debugging  
 
 ⚠️ This module is focused solely on budget data retrieval.  
 It does not perform downstream validation, transformation, or 
-data warehouse operations such as BigQuery ingestion.
+data warehouse operations such as Google BigQuery ingestion.
 ==================================================================
 """
 
@@ -105,7 +105,7 @@ def fetch_budget_allocation(fetch_month_allocation: str) -> pd.DataFrame:
         finally:
             fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)
 
-    # 1.1.2. Initialize Google Secret Manager client
+    # 1.1.3. Initialize Google Secret Manager client
         fetch_section_name = "[FETCH] Initialize Google Secret Manager client"
         fetch_section_start = time.time()                
         try:
@@ -122,7 +122,7 @@ def fetch_budget_allocation(fetch_month_allocation: str) -> pd.DataFrame:
         finally:
             fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)      
 
-    # 1.1.3. Get Budget Allocation from Google Secret Manager
+    # 1.1.4. Get Budget Allocation from Google Secret Manager
         fetch_section_name = "[FETCH] Get Budget Allocation from Google Secret Manager"
         fetch_section_start = time.time()         
         try:
@@ -142,7 +142,7 @@ def fetch_budget_allocation(fetch_month_allocation: str) -> pd.DataFrame:
         finally:
             fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)
 
-    # 1.1.4. Initialize Google Sheets client
+    # 1.1.5. Initialize Google Sheets client
         fetch_section_name = "[FETCH] Initialize Google Sheets client"
         fetch_section_start = time.time()            
         try:
@@ -162,7 +162,7 @@ def fetch_budget_allocation(fetch_month_allocation: str) -> pd.DataFrame:
         finally:
             fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2) 
     
-    # 1.1.5. Make Google Sheets API call for worksheet recording
+    # 1.1.6. Make Google Sheets API call for worksheet recording
         fetch_section_name = "[FETCH] Make Google Sheets API call for worksheet recording"
         fetch_section_start = time.time()             
         try:
@@ -185,7 +185,7 @@ def fetch_budget_allocation(fetch_month_allocation: str) -> pd.DataFrame:
         finally:
             fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)
    
-    # 1.1.6. Trigger to enforce schema for Budget Allocation
+    # 1.1.7. Trigger to enforce schema for Budget Allocation
         fetch_section_name = "[FETCH] Trigger to enforce schema for Budget Allocation"
         fetch_section_start = time.time()              
         try:            
@@ -206,7 +206,7 @@ def fetch_budget_allocation(fetch_month_allocation: str) -> pd.DataFrame:
         finally:
             fetch_sections_time[fetch_section_name] = round(time.time() - fetch_section_start, 2)
 
-    # 1.1.7. Summarize fetch results for Budget Allocation
+    # 1.1.8. Summarize fetch results for Budget Allocation
     finally:
         fetch_time_elapsed = round(time.time() - fetch_time_start, 2)
         fetch_df_final = fetch_df_enforced.copy() if "fetch_df_enforced" in locals() and not fetch_df_enforced.empty else pd.DataFrame()
