@@ -77,7 +77,6 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
     enrich_sections_status = {}
     enrich_sections_time = {}
     enrich_df_table = pd.DataFrame()
-    enrich_df_other = pd.DataFrame()
     print(f"🔍 [ENRICH] Proceeding to enrich staging Budget Allocation for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
     logging.info(f"🔍 [ENRICH] Proceeding to enrich staging Budget Allocation for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
 
