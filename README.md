@@ -1,6 +1,6 @@
-KidsPlaza Budget Allocation Pipeline powers the internal ETL process at KidsPlaza, automating the ingestion, transformation, and loading of digital advertising data into our centralized Google BigQuery warehouse.
+KidsPlaza Budget Allocation Pipeline powers the Digital Advertising Data Analysis process at KidsPlaza by automating the ingestion, transformation and loading of digital advertising data into our centralized Google BigQuery warehouse.
 
-It integrates Budget Allocation Insights data, supporting both daily sync and historical backfills. The pipeline is structured around modular stages such as fetch, enrich, ingest, staging, and mart, making it easier to test, maintain, and extend.
+It integrates Budget Allocation Insights data, supporting both daily sync and historical backfills. The pipeline is structured around modular stages such as fetch, enrich, ingest, staging, mart, making it easier to test, maintain and extend.
 
 This repository is maintained by the Digital Marketing Team at KidsPlaza. For questions, access requests, or contributions, please contact the team via email at quang.nn@kidsplaza.vn (internal) or nhatquang.nguyen.129@gmail.com (external), or reach out via the internal Slack channel #data-engineering.
 
