@@ -6,17 +6,17 @@ This module handles direct, authenticated access to predefined
 Google Sheets sources, serving as the unified interface to 
 retrieve marketing budget allocations across different scopes.
 
-It enables structured, centralized logic for reading and normalizing 
-budget data by category (e.g., system-wide, supplier co-op, local), 
-intended to be used as part of the ETL pipeline's extraction layer.
+It enables structured, centralized logic for reading and 
+normalizing budget data by category intended to be used as part 
+of the Budget Allocation ETL pipeline's extraction layer.
 
 ✔️ Authenticates securely via Service Account credentials  
 ✔️ Loads budget data from configured Google Sheets tabs  
 ✔️ Maps sheet-to-category via hardcoded internal mapping  
 ✔️ Returns clean pandas DataFrames for further processing
-✔️ Logs detailed runtime information for monitoring and debugging
+✔️ Logs detailed runtime information for monitoring
 
-⚠️ This module is focused solely on *budget data retrieval*.  
+⚠️ This module is focused solely on budget data retrieval.  
 It does not perform downstream validation, transformation, or 
 data warehouse operations such as BigQuery ingestion.
 ==================================================================
@@ -30,13 +30,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.
 # Add Python logging ultilties for integration
 import logging
 
-# Add Python Pandas libraries for integration
-import pandas as pd
-
 # Add Python time ultilities for integration
 import time
 
-# Add Google Authentication libraries for integration
+# Add Python Pandas libraries for integration
+import pandas as pd
+
+# Add Google Authentication modules for integration
 from google.auth import default
 from google.auth.transport.requests import AuthorizedSession
 
@@ -46,7 +46,7 @@ from google.cloud import secretmanager
 # Add Google Spreadsheets API modules for integration
 import gspread
 
-# Add internal Budget module for handling
+# Add internal Budget Allocation module for handling
 from src.schema import enforce_table_schema
 
 # Get environment variable for Company
