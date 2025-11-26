@@ -2,19 +2,19 @@
 ==================================================================
 BUDGET ENRICHMENT MODULE
 ------------------------------------------------------------------
-This module is responsible for transforming raw Budget Allocation 
+This module is responsible for transforming Budget Allocation 
 data with standardized metadata, mappings, business logic to 
-produce a clean and analysis-ready mart for downstream usage.
+produce cleaned data for downstream usage.
 
 By centralizing enrichment rules, this module ensures transparency, 
-consistency, and maintainability across the marketing data pipeline 
-to build insight-ready tables.
+consistency and maintainability across the Budget Allocation 
+pipeline.
 
 ✔️ Merges budget data with dimension tables for unified identifiers  
 ✔️ Standardizes program track, type and group naming conventions  
 ✔️ Extracts and normalizes key performance metrics across campaigns  
 ✔️ Cleans and validates data to ensure schema and field consistency  
-✔️ Reduces payload size by removing redundant or raw field(s)
+✔️ Reduces payload size by removing redundant or raw fields
 
 ⚠️ This module focuses only on enrichment and transformation logic.  
 It does not handle data fetching, ingestion or staging.
@@ -32,11 +32,11 @@ from datetime import datetime
 # Add Python logging ultilities for integraton
 import logging
 
-# Add Python timezone ultilities for integration
-import pytz
-
 # Add Python regular expression operations ultilities for integraton
 import re
+
+# Add Python timezone ultilities for integration
+import pytz
 
 # Add Python time ultilities for integration
 import time

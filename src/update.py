@@ -147,44 +147,49 @@ def update_budget_allocation(update_month_allocation: str) -> None:
     finally:
         update_time_total = round(time.time() - update_time_start, 2)
         print("\n📊 [UPDATE] BUDGET ALLOCATION UPDATE SUMMARY")
-        print("=" * 110)
+        print("=" * 120)
         print(f"{'Step':<80} | {'Status':<10} | {'Time (s)'}")
-        print("-" * 110)
-        summary_map = {
-            "[UPDATE] Trigger to ingest Budget Allocation": "ingest_results_allocation",
-            "[UPDATE] Trigger to build staging Budget Allocation": "staging_results_allocation",
-            "[UPDATE] Trigger to materialize Budget Allocation": "mart_results_allocation",
+        print("-" * 120)
+
+        # Summarize sections mapping to results dicts
+        update_summary_mapping = {
+            "[UPDATE] Trigger to ingest Budget Allocation": locals().get("ingest_results_allocation"),
+            "[UPDATE] Trigger to build staging Budget Allocation": locals().get("staging_results_allocation"),
+            "[UPDATE] Trigger to materialize Budget Allocation": locals().get("mart_results_allocation"),
         }
-        locals_dict = locals()
-        for update_step_name, update_step_status in update_sections_status.items():
-            summary_obj = None
-            if update_step_name in summary_map and summary_map[update_step_name] in locals_dict:
-                summary_obj = locals_dict[summary_map[update_step_name]]
-            nested_summary = None
-            if summary_obj and isinstance(summary_obj, dict):
-                for k in summary_obj.keys():
-                    if k.endswith("_summary_final"):
-                        nested_summary = summary_obj[k]
+        for update_section_name, update_section_status in update_sections_status.items():
+            update_section_result = update_summary_mapping.get(update_section_name)
+            update_summary_nested = None
+
+        # Determine nested _summary_final
+            if isinstance(update_section_result, dict):
+                for k, v in update_section_result.items():
+                    if isinstance(v, dict) and k.endswith("_summary_final"):
+                        update_summary_nested = v
                         break
-            candidate_dict = (nested_summary or summary_obj or {})
-            step_time = None
-            for key in ["ingest_time_elapsed", "staging_time_elapsed", "mart_time_elapsed"]:
-                if key in candidate_dict and candidate_dict[key] is not None:
-                    step_time = candidate_dict[key]
-                    break
-            if step_time is None:
-                step_time = "-"
-            time_str = "-" if step_time == "-" else f"{step_time:>8.2f}"
-            print(f"• {update_step_name:<76} | {update_step_status:<10} | {time_str}")
-            if nested_summary:
-                for detail_key in [k for k in nested_summary.keys() if k.endswith("_sections_detail")]:
-                    detail_dict = nested_summary[detail_key]
-                    for idx, (sub_step, sub_info) in enumerate(detail_dict.items(), start=1):
-                        sub_status = sub_info.get("status", "-")
-                        sub_time_section = sub_info.get("time", 0.0)
-                        sub_loop_time = sub_info.get("loop_time", 0.0)
-                        sub_total = round(sub_time_section + sub_loop_time, 2)
-                        print(f"    {idx:>2}. {sub_step:<70} | {sub_status:<10} | {sub_total:>8.2f}")
-        print("-" * 110)
+
+        # Determine section time
+            update_section_time = "-"
+            if update_summary_nested:
+                for k in ("ingest_time_elapsed", "staging_time_elapsed", "mart_time_elapsed", "time_elapsed"):
+                    if k in update_summary_nested and isinstance(update_summary_nested[k], (float, int)):
+                        update_section_time = f"{update_summary_nested[k]:>8.2f}"
+                        break
+
+        # Print sub-sections detail
+            print(f"• {update_section_name:<76} | {update_section_status:<10} | {update_section_time}")
+            if update_summary_nested:
+                for update_section_detail in ["sections_detail", "mart_sections_detail", "staging_sections_detail", "ingest_sections_detail"]:
+                    sub_section_detail = update_summary_nested.get(update_section_detail)
+                    if isinstance(sub_section_detail, dict):
+                        for idx, (sub_section_name, sub_section_detail) in enumerate(sub_section_detail.items(), start=1):
+                            sub_section_status = sub_section_detail.get("status", "-")
+                            sub_time_single = sub_section_detail.get("time", 0.0) or 0.0
+                            sub_time_loop = sub_section_detail.get("loop_time", 0.0) or 0.0
+                            sub_time_total = round(sub_time_single + sub_time_loop, 2)
+                            print(f"    {idx:>2}. {sub_section_name:<70} | {sub_section_status:<10} | {sub_time_total:>8.2f}")
+
+        # Print total execution result
+        print("-" * 120)
         print(f"{'Total execution time':<80} | {'-':<10} | {update_time_total:>8.2f}s")
-        print("=" * 110)
+        print("=" * 120)
