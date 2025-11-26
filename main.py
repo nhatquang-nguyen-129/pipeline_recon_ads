@@ -25,14 +25,14 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
-# Add Python dynamic import ultilities for integration
-import importlib
-
 # Add Python datetime ultilities for integration
 from datetime import (
     datetime, 
     timedelta
 )
+
+# Add Python dynamic import ultilities for integration
+import importlib
 
 # Add Python logging ultilities for integration
 import logging
@@ -60,36 +60,36 @@ MODE = os.getenv("MODE")
 
 # Get validated environment variables
 if not all([COMPANY, PLATFORM, ACCOUNT, LAYER, MODE]):
-    raise EnvironmentError("❌ [MAIN] Missing required environment variables COMPANY/PLATFORM/ACCOUNT/LAYER/MODE.")
+    raise EnvironmentError("❌ [MAIN] Failed to trigger Budget Allocation update due to missing required environment variables COMPANY/PLATFORM/ACCOUNT/LAYER/MODE.")
 
 # 1. MAIN ENTRYPOINT CONTROLLER
 
 # 1.1. Validate input for main entrypoint function
 if PLATFORM != "budget":
-    raise ValueError("❌ [MAIN] Only 'budget' platform is supported in this script.")
+    raise ValueError(f"❌ [MAIN] Failed to trigger Budget Allocation update due to {PLATFORM} platform is unsupported.")
 try:
     update_module_location = importlib.import_module(f"src.update")
 except ModuleNotFoundError:
-    raise ImportError(f"❌ [MAIN] Platform '{PLATFORM}' is not supported so please ensure src/update.py exists.")
+    raise ImportError("❌ [MAIN] Failed to trigger Budget Allocation update due to src/update.py not exist.")
 
 # 1.2. Execution controller
 def main():
-    update_day_today = datetime.today()
+    update_date_today = datetime.today()
     if PLATFORM == "budget":
         try:
             update_budget_allocation = update_module_location.update_budget_allocation
         except AttributeError:
-            raise ImportError(f"❌ [MAIN] Budget update module must define 'update_budget_allocation'.")
+            raise ImportError(f"❌ [MAIN] Failed to locate Budget Allocation update module due to update_budget_allocation must be defined.")
         if MODE == "thismonth":
-            main_month_updated = update_day_today.strftime("%Y-%m")
+            main_month_updated = update_date_today.strftime("%Y-%m")
         elif MODE == "lastmonth":
-            main_day_first = update_day_today.replace(day=1)
-            main_day_last = main_day_first - timedelta(days=1)
-            main_month_updated = main_day_last.strftime("%Y-%m")
+            main_day_start = update_date_today.replace(day=1)
+            main_day_end = main_day_start - timedelta(days=1)
+            main_month_updated = main_day_end.strftime("%Y-%m")
         else:
-            raise ValueError(f"⚠️ [MAIN] Unsupported mode {MODE} for budget and use 'thismonth' or 'lastmonth' instead.")
+            raise ValueError(f"⚠️ [MAIN] Failed to trigger Budget Allocation update due to unsupported mode {MODE} for so please use 'thismonth' or 'lastmonth' instead.")
         if LAYER != "all":
-            raise ValueError(f"⚠️ [MAIN] Unsupported layer {LAYER} for budget and use 'all' only.")
+            raise ValueError(f"⚠️ [MAIN] Failed to trigger Budget Allocation update due to unsupported layer {LAYER} so please use 'all' only.")
         try:
             print(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {main_month_updated} month...")
             logging.info(f"🚀 [MAIN] Starting to update {PLATFORM} allocation of {COMPANY} company in {MODE} mode and {DEPARTMENT} department with {ACCOUNT} account for {main_month_updated} month...")
