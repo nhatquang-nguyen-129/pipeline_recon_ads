@@ -4,11 +4,11 @@ BUDGET STAGING MODULE
 ------------------------------------------------------------------
 This module transforms raw Budget Allocation data into enriched,  
 normalized staging tables in BigQuery, acting as the bridge  
-between raw API ingestion and final MART-level analytics.
+between raw API ingestion and final materialized analytics.
 
-It combines track/program/type data, applies business logic  
-(e.g., parsing naming conventions, standardizing fields), and  
-prepares clean, query-ready datasets for downstream consumption.
+It combines track, program, type data, applies business logic  
+and included parsing naming conventions, standardizing fields to
+prepares clean datasets for downstream consumption.
 
 ✔️ Joins raw budget allocation with track and program data
 ✔️ Enriches fields such as owner, placement and format  
@@ -117,7 +117,7 @@ def staging_budget_allocation() -> dict:
             staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)
 
     # 1.1.4. Scan all raw budget allocation table(s)
-        staging_section_name = "[STAGING] can all raw budget allocation table(s)"
+        staging_section_name = "[STAGING] Scan all raw budget allocation table(s)"
         staging_section_start = time.time()            
         try:
             print(f"🔍 [STAGING] Scanning all raw Budget Allocation table(s) from Google BigQuery dataset {raw_dataset}...")
@@ -170,10 +170,9 @@ def staging_budget_allocation() -> dict:
                     continue
         finally:
             staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)
-
         if len(staging_tables_queried) == len(raw_tables_budget):
             staging_sections_status[staging_section_name] = "succeed"
-        elif len(staging_tables_queried) > 0:
+        elif 0 < len(staging_tables_queried) < len(raw_tables_budget):
             staging_sections_status[staging_section_name] = "partial"
         else:
             staging_sections_status[staging_section_name] = "failed"
@@ -205,7 +204,7 @@ def staging_budget_allocation() -> dict:
             staging_sections_time[staging_section_name] = round(time.time() - staging_section_start, 2)                        
         if len(staging_tables_enriched) == len(staging_tables_queried):
             staging_sections_status[staging_section_name] = "succeed"
-        elif len(staging_tables_enriched) > 0:
+        elif 0 < len(staging_tables_enriched) < len(staging_tables_queried):
             staging_sections_status[staging_section_name] = "partial"
         else:
             staging_sections_status[staging_section_name] = "failed"
