@@ -3,7 +3,7 @@
 BUDTE SCHEMA MODULE
 -------------------------------------------------------------------
 This module provides a centralized definition and management of  
-schema structures used throughout the Budget data pipeline.  
+schema structures used throughout the Budget Allocation pipeline.  
 It shares a consistent structure and data type alignment.  
 
 Its main purpose is to validate, enforce, and standardize field 
@@ -18,7 +18,7 @@ execution and seamless data integration.
 
 ⚠️ This module does not perform data fetching or transformation.  
 It serves purely as a utility layer to support schema consistency  
-throughout the Budget ETL process.
+throughout the Budget Allocation pipeline.
 ===================================================================
 """
 
