@@ -6,7 +6,7 @@ This module performs incremental updates to Budget Allocation data
 at the raw layer, providing an efficient mechanism for refreshing  
 recent or specific datasets without the need for full reloads.
 
-By supporting targeted updates (per day, layer, or entity), it  
+By supporting targeted updates included per day, layer or entity, it
 enables faster turnaround for near-real-time dashboards and daily  
 data sync jobs while maintaining historical accuracy and integrity.
 
@@ -16,9 +16,9 @@ data sync jobs while maintaining historical accuracy and integrity.
 ✔️ Implements error handling and retry logic for partial failures  
 ✔️ Designed for integration in daily or on-demand sync pipelines  
 
-⚠️ This module is strictly responsible for *RAW layer updates only*.  
-It does not perform transformations, enrichment, or aggregations.  
-Processed data is consumed by the STAGING and MART modules.
+⚠️ This module is strictly responsible for raw layer updates only.  
+It does not perform transformations, enrichment or aggregations.  
+Processed data is consumed by the staging and materialization modules.
 ==================================================================
 """
 
@@ -27,13 +27,13 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
-# Add logging capability for tracking process execution and errors
+# Add Python logging ultilities for integration
 import logging
 
-# Add Python 'time' library for tracking execution time and implementing delays
+# Add Python time ultilities for integration
 import time
 
-# Add internal Budget service for data handling
+# Add internal Budget Allocation modules for handling
 from src.ingest import ingest_budget_allocation
 from src.staging import staging_budget_allocation
 from src.mart import (
@@ -63,7 +63,7 @@ MODE = os.getenv("MODE")
 
 # 1. UPDATE BUDGET ALLOCATION FOR A GIVEN DATE RANGE
 
-# 1.1. Update budget allocation data for a given date range
+# 1.1. Update Budget Allocation data for a given date range
 def update_budget_allocation(update_month_allocation: str) -> None:
     print(f"🚀 [UPDATE] Starting to update Budget Allocation for month {update_month_allocation}...")
     logging.info(f"🚀 [UPDATE] Starting to update Budget Allocation for month {update_month_allocation}...")
@@ -161,7 +161,7 @@ def update_budget_allocation(update_month_allocation: str) -> None:
             update_section_result = update_summary_mapping.get(update_section_name)
             update_summary_nested = None
 
-        # Determine nested _summary_final
+        # Determine nested summary final
             if isinstance(update_section_result, dict):
                 for k, v in update_section_result.items():
                     if isinstance(v, dict) and k.endswith("_summary_final"):
