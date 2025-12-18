@@ -43,7 +43,9 @@ from zoneinfo import ZoneInfo
 from src.ingest import ingest_budget_allocation
 from src.staging import staging_budget_allocation
 from src.mart import (
-    mart_budget_allocation
+    mart_budget_allocation,
+    mart_aggregate_all,
+    mart_recon_all,
 )
 
 # Get environment variable for Company
@@ -150,7 +152,49 @@ def update_budget_allocation(update_month_allocation: str) -> None:
         finally:
             update_sections_time[update_section_name] = round(time.time() - update_section_start, 2)
 
-    # 1.1.5. Summarize update results for Budget Allocation
+    # 1.1.5. Trigger to materialize Spending Aggregation
+        update_section_name = "[UPDATE] Trigger to materialize Spending Aggregation"
+        update_section_start = time.time()
+        try:
+            if staging_status_campaign in ["staging_succeed_all", "staging_failed_partial"]:
+                print("🔄 [UPDATE] Triggering to materialize Spending Aggregation...")
+                logging.info("🔄 [UPDATE] Triggering to materialize Spending Aggregation...")
+                mart_results_allocation = mart_aggregate_all()
+                mart_status_all = mart_results_allocation["mart_status_final"]
+                mart_summary_all = mart_results_allocation["mart_summary_final"]                
+                if mart_status_all == "mart_succeed_all":
+                    update_sections_status[update_section_name] = "succeed"
+                    print(f"✅ [UPDATE] Successfully completed Spending Aggregation materialization in {mart_summary_all['mart_time_elapsed']}s.")
+                    logging.info(f"✅ [UPDATE] Successfully completed Spending Aggregation materialization in {mart_summary_all['mart_time_elapsed']}s.")                    
+                elif mart_status_all == "mart_failed_all":
+                    update_sections_status[update_section_name] = "failed"
+                    print(f"❌ [UPDATE] Failed to complete Spending Aggregation materialization with {mart_summary_all['mart_rows_output']} in {mart_summary_all['mart_time_elapsed']}s.")
+                    logging.error(f"❌ [UPDATE] Failed to complete Spending Aggregation materialization with {mart_summary_all['mart_rows_output']} in {mart_summary_all['mart_time_elapsed']}s.")                    
+        finally:
+            update_sections_time[update_section_name] = round(time.time() - update_section_start, 2)
+
+    # 1.1.6. Trigger to materialize Monthly Reconciliation
+        update_section_name = "[UPDATE] Trigger to materialize Monthly Reconciliation"
+        update_section_start = time.time()
+        try:
+            if staging_status_campaign in ["staging_succeed_all", "staging_failed_partial"]:
+                print("🔄 [UPDATE] Triggering to materialize Monthly Reconciliation...")
+                logging.info("🔄 [UPDATE] Triggering to materialize Monthly Reconciliation...")
+                mart_results_allocation = mart_recon_all()
+                mart_status_all = mart_results_allocation["mart_status_final"]
+                mart_summary_all = mart_results_allocation["mart_summary_final"]                
+                if mart_status_all == "mart_succeed_all":
+                    update_sections_status[update_section_name] = "succeed"
+                    print(f"✅ [UPDATE] Successfully completed Monthly Reconciliation materialization in {mart_summary_all['mart_time_elapsed']}s.")
+                    logging.info(f"✅ [UPDATE] Successfully completed Monthly Reconciliation materialization in {mart_summary_all['mart_time_elapsed']}s.")                    
+                elif mart_status_all == "mart_failed_all":
+                    update_sections_status[update_section_name] = "failed"
+                    print(f"❌ [UPDATE] Failed to complete Monthly Reconciliation materialization with {mart_summary_all['mart_rows_output']} in {mart_summary_all['mart_time_elapsed']}s.")
+                    logging.error(f"❌ [UPDATE] Failed to complete Monthly Reconciliation materialization with {mart_summary_all['mart_rows_output']} in {mart_summary_all['mart_time_elapsed']}s.")                    
+        finally:
+            update_sections_time[update_section_name] = round(time.time() - update_section_start, 2)
+
+    # 1.1.7. Summarize update results for Budget Allocation
     finally:
         update_time_total = round(time.time() - update_time_start, 2)
         print("\n📊 [UPDATE] BUDGET ALLOCATION UPDATE SUMMARY")
@@ -163,6 +207,8 @@ def update_budget_allocation(update_month_allocation: str) -> None:
             "[UPDATE] Trigger to ingest Budget Allocation": locals().get("ingest_results_allocation"),
             "[UPDATE] Trigger to build staging Budget Allocation": locals().get("staging_results_allocation"),
             "[UPDATE] Trigger to materialize Budget Allocation": locals().get("mart_results_allocation"),
+            "[UPDATE] Trigger to materialize Spending Aggregation": locals().get("mart_results_allocation"),
+            "[UPDATE] Trigger to materialize Monthly Reconciliation": locals().get("mart_results_allocation"),
         }
         for update_section_name, update_section_status in update_sections_status.items():
             update_section_result = update_summary_mapping.get(update_section_name)
