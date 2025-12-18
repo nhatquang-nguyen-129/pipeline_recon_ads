@@ -11,8 +11,8 @@ enables faster turnaround for near-real-time dashboards and daily
 data sync jobs while maintaining historical accuracy and integrity.
 
 ✔️ Handles incremental data ingestion from the GSpread API
-✔️ Supports selective updates for campaign, adset, ad or creative  
-✔️ Preserves schema alignment with staging and MART layers  
+✔️ Supports selective updates for multiple layer 
+✔️ Preserves schema alignment with staging and materialization
 ✔️ Implements error handling and retry logic for partial failures  
 ✔️ Designed for integration in daily or on-demand sync pipelines  
 
@@ -27,11 +27,17 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
+# Add Python datetime utilities for integration
+from datetime import datetime
+
 # Add Python logging ultilities for integration
 import logging
 
 # Add Python time ultilities for integration
 import time
+
+# Add Python IANA time zone ultilities for integration
+from zoneinfo import ZoneInfo
 
 # Add internal Budget Allocation modules for handling
 from src.ingest import ingest_budget_allocation
@@ -69,11 +75,12 @@ def update_budget_allocation(update_month_allocation: str) -> None:
     logging.info(f"🚀 [UPDATE] Starting to update Budget Allocation for month {update_month_allocation}...")
 
     # 1.1.1. Start timing TikTok Ads campaign insights update
+    ICT = ZoneInfo("Asia/Ho_Chi_Minh")    
     update_time_start = time.time()
     update_sections_status = {}
     update_sections_time = {}
-    print(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {update_month_allocation} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
-    logging.info(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {update_month_allocation} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    print(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {update_month_allocation} at {datetime.now(ICT).strftime("%Y-%m-%d %H:%M:%S")}...")
+    logging.info(f"🔍 [UPDATE] Proceeding to update Budget Allocation for month {update_month_allocation} at {datetime.now(ICT).strftime("%Y-%m-%d %H:%M:%S")}...")
 
     try:  
 
@@ -84,13 +91,13 @@ def update_budget_allocation(update_month_allocation: str) -> None:
             print(f"🔄 [UPDATE] Triggering to ingest Budget Allocation for month {update_month_allocation}...")
             logging.info(f"🔄 [UPDATE] Triggering to ingest Budget Allocation for month {update_month_allocation}...")
             ingest_results_allocation = ingest_budget_allocation(ingest_month_allocation=update_month_allocation)
-            ingest_df_insights = ingest_results_allocation["ingest_df_final"]
-            ingest_status_insights = ingest_results_allocation["ingest_status_final"]
+            ingest_df_insights = ingest_results_allocation["ingest_df_final"]            
             ingest_summary_insights = ingest_results_allocation["ingest_summary_final"]
+            ingest_status_insights = ingest_results_allocation["ingest_status_final"]
             if ingest_status_insights == "ingest_succeed_all":
-                print(f"✅ [UPDATE] Successfully triggered Budget Allocation ingestion for month {update_month_allocation} with {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
-                logging.info(f"✅ [UPDATE] Successfully triggered Budget Allocation ingestion for month {update_month_allocation} with {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
                 update_sections_status[update_section_name] = "succeed"
+                print(f"✅ [UPDATE] Successfully triggered Budget Allocation ingestion for month {update_month_allocation} with {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
+                logging.info(f"✅ [UPDATE] Successfully triggered Budget Allocation ingestion for month {update_month_allocation} with {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")                
             else:
                 update_sections_status[update_section_name] = "failed"
                 print(f"❌ [UPDATE] Failed to trigger Budget Allocation ingestion for month {update_month_allocation} {ingest_summary_insights['ingest_rows_output']} ingested row(s) in {ingest_summary_insights['ingest_time_elapsed']}s.")
@@ -104,21 +111,21 @@ def update_budget_allocation(update_month_allocation: str) -> None:
         try:
             print("🔄 [UPDATE] Triggering to create or overwrite staging Budget Allocation table...")
             logging.info("🔄 [UPDATE] Triggering to create or overwrite staging Budget Allocation table...")
-            staging_results_allocation = staging_budget_allocation()
-            staging_status_campaign = staging_results_allocation["staging_status_final"]
+            staging_results_allocation = staging_budget_allocation()            
             staging_summary_campaign = staging_results_allocation["staging_summary_final"]
+            staging_status_campaign = staging_results_allocation["staging_status_final"]
             if staging_status_campaign == "staging_succeed_all":
+                update_sections_status[update_section_name] = "succeed"                
                 print(f"✅ [UPDATE] Successfully triggered Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
-                logging.info(f"✅ [UPDATE] Successfully triggered Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
-                update_sections_status[update_section_name] = "succeed"
+                logging.info(f"✅ [UPDATE] Successfully triggered Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")                
             elif staging_status_campaign == "staging_failed_partial":
-                print(f"⚠️ [UPDATE] Partially triggered Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
-                logging.warning(f"⚠️ [UPDATE] Partially triggered Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
                 update_sections_status[update_section_name] = "partial"
+                print(f"⚠️ [UPDATE] Partially triggered Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
+                logging.warning(f"⚠️ [UPDATE] Partially triggered Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")                
             else:
-                print(f"❌ [UPDATE] Failed to trigger Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
-                logging.error(f"❌ [UPDATE] Failed to trigger Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
                 update_sections_status[update_section_name] = "failed"
+                print(f"❌ [UPDATE] Failed to trigger Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")
+                logging.error(f"❌ [UPDATE] Failed to trigger Budget Allocation staging with {staging_summary_campaign['staging_tables_output']}/{staging_summary_campaign['staging_tables_input']} table(s) on {staging_summary_campaign['staging_tables_input']} queried table(s) and {staging_summary_campaign['staging_rows_output']} uploaded row(s) in {staging_summary_campaign['staging_time_elapsed']}s.")                
         finally:
             update_sections_time[update_section_name] = round(time.time() - update_section_start, 2)
 
@@ -133,13 +140,13 @@ def update_budget_allocation(update_month_allocation: str) -> None:
                 mart_status_all = mart_results_allocation["mart_status_final"]
                 mart_summary_all = mart_results_allocation["mart_summary_final"]                
                 if mart_status_all == "mart_succeed_all":
-                    print(f"✅ [UPDATE] Successfully completed Budget Allocation materialization in {mart_summary_all['mart_time_elapsed']}s.")
-                    logging.info(f"✅ [UPDATE] Successfully completed Budget Allocation materialization in {mart_summary_all['mart_time_elapsed']}s.")
                     update_sections_status[update_section_name] = "succeed"
+                    print(f"✅ [UPDATE] Successfully completed Budget Allocation materialization in {mart_summary_all['mart_time_elapsed']}s.")
+                    logging.info(f"✅ [UPDATE] Successfully completed Budget Allocation materialization in {mart_summary_all['mart_time_elapsed']}s.")                    
                 elif mart_status_all == "mart_failed_all":
-                    print(f"❌ [UPDATE] Failed to complete Budget Allocation materialization due to unsuccessful section(s) of {', '.join(mart_summary_all['mart_sections_failed']) if mart_summary_all['mart_sections_failed'] else 'unknown'}.")
-                    logging.error(f"❌ [UPDATE] Failed to complete Budget Allocation materialization due to unsuccessful section(s) of {', '.join(mart_summary_all['mart_sections_failed']) if mart_summary_all['mart_sections_failed'] else 'unknown'}.")
                     update_sections_status[update_section_name] = "failed"
+                    print(f"❌ [UPDATE] Failed to complete Budget Allocation materialization with {mart_summary_all['mart_rows_output']} in {mart_summary_all['mart_time_elapsed']}s.")
+                    logging.error(f"❌ [UPDATE] Failed to complete Budget Allocation materialization with {mart_summary_all['mart_rows_output']} in {mart_summary_all['mart_time_elapsed']}s.")                    
         finally:
             update_sections_time[update_section_name] = round(time.time() - update_section_start, 2)
 
