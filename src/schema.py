@@ -1,6 +1,6 @@
 """
 ===================================================================
-BUDTE SCHEMA MODULE
+BUDGET SCHEMA MODULE
 -------------------------------------------------------------------
 This module provides a centralized definition and management of  
 schema structures used throughout the Budget Allocation pipeline.  
@@ -27,11 +27,17 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
+# Add Python datetime utilities for integration
+from datetime import datetime
+
 # Add Python logging ultilities for integration
 import logging
 
 # Add Python time ultilities for integration
 import time
+
+# Add Python IANA time zone ultilities for integration
+from zoneinfo import ZoneInfo
 
 # Add Python Pandas libraries for integration
 import pandas as pd
@@ -44,11 +50,12 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
     logging.info(f"🚀 [SCHEMA] Starting to enforce schema {schema_type_mapping} on Python DataFrame with {schema_df_input.shape[1]} column(s)...")
     
     # 1.1.1. Start timing the Budget Allocation enrichment
+    ICT = ZoneInfo("Asia/Ho_Chi_Minh")    
     schema_time_start = time.time()
     schema_sections_status = {}
     schema_sections_time = {}
-    print(f"🔍 [SCHEMA] Proceeding to enforce schema for Budget Allocation with {len(schema_df_input)} given row(s) for mapping type {schema_type_mapping} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
-    logging.info(f"🔍 [SCHEMA] Proceeding to enforce schema for Budget Allocation with {len(schema_df_input)} given row(s) for mapping type {schema_type_mapping} at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    print(f"🔍 [SCHEMA] Proceeding to enforce schema for Budget Allocation with {len(schema_df_input)} given row(s) for mapping type {schema_type_mapping} at {datetime.now(ICT).strftime("%Y-%m-%d %H:%M:%S")}...")
+    logging.info(f"🔍 [SCHEMA] Proceeding to enforce schema for Budget Allocation with {len(schema_df_input)} given row(s) for mapping type {schema_type_mapping} at {datetime.now(ICT).strftime("%Y-%m-%d %H:%M:%S")}...")
 
     # 1.1.2. Define schema mapping for Budget Allocation data type
     schema_section_name = "[SCHEMA] Define schema mapping for Budget Allocation data type"
@@ -139,8 +146,8 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
         try:
             if schema_type_mapping not in schema_types_mapping:
                 schema_sections_status[schema_section_name] = "failed"
-                print(f"❌ [SCHEMA] Failed to validate schema type {schema_type_mapping} for Budget Allocation then enforcement will be suspended.")
-                logging.error(f"❌ [SCHEMA] Failed to validate schema type {schema_type_mapping} for Budget Allocation then enforcement will be suspended.")
+                print(f"❌ [SCHEMA] Failed to validate schema type {schema_type_mapping} for Budget Allocation then enforcement is suspended.")
+                logging.error(f"❌ [SCHEMA] Failed to validate schema type {schema_type_mapping} for Budget Allocation then enforcement is suspended.")
             else:
                 schema_columns_expected = schema_types_mapping[schema_type_mapping]
                 schema_sections_status[schema_section_name] = "succeed"
@@ -164,6 +171,7 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
                         schema_df_enforced[schema_column_expected] = pd.to_numeric(
                             schema_df_enforced[schema_column_expected].astype(str).str.replace(",", "."), errors="coerce"
                         ).fillna(0).astype(int)
+
                     elif schema_data_type == float:
                         schema_df_enforced[schema_column_expected] = pd.to_numeric(
                             schema_df_enforced[schema_column_expected].astype(str).str.replace(",", "."), errors="coerce"
@@ -177,18 +185,18 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
                     else:
                         schema_df_enforced[schema_column_expected] = schema_df_enforced[schema_column_expected]
                 except Exception as e:
-                    print(f"⚠️ [SCHEMA] Failed to coerce column {schema_column_expected} of Budget Allocation to {schema_data_type} due to {e}.")
-                    logging.warning(f"⚠️ [SCHEMA] Failed to coerce column {schema_column_expected} of Budget Allocation to {schema_data_type} due to {e}.")
+                    print(f"⚠️ [SCHEMA] Failed to coerce column {schema_column_expected} to {schema_data_type} due to {e}.")
+                    logging.warning(f"⚠️ [SCHEMA] Failed to coerce column {schema_column_expected} to {schema_data_type} due to {e}.")
             schema_df_enforced = schema_df_enforced[list(schema_columns_expected.keys())]       
+            schema_sections_status[schema_section_name] = "succeed"
             print(f"✅ [SCHEMA] Successfully enforced schema for Budget Allocation with {len(schema_df_enforced)} row(s) and schema type {schema_type_mapping}.")
             logging.info(f"✅ [SCHEMA] Successfully enforced schema for Budget Allocation with {len(schema_df_enforced)} row(s) and schema type {schema_type_mapping}.")
-            schema_sections_status[schema_section_name] = "succeed"        
         except Exception as e:
             schema_sections_status[schema_section_name] = "failed"
             print(f"❌ [SCHEMA] Failed to enforce schema for Budget Allocation with schema type {schema_type_mapping} due to {e}.")
             logging.error(f"❌ [SCHEMA] Failed to enforce schema for Budget Allocation with schema type {schema_type_mapping} due to {e}.")
         finally:
-            schema_sections_time[schema_section_name] = round(time.time() - schema_section_start, 2)   
+            schema_sections_time[schema_section_name] = round(time.time() - schema_section_start, 2)    
 
     # 1.1.5. Summarize schema enforcement results for Budget Allocation
     finally:
@@ -210,14 +218,18 @@ def enforce_table_schema(schema_df_input: pd.DataFrame, schema_type_mapping: str
             }
             for schema_section_summary in schema_sections_summary
         }         
-        if any(v == "failed" for v in schema_sections_status.values()):
-            print(f"❌ [SCHEMA] Failed to complete schema enforcement for Budget Allocation due to section(s): {', '.join(schema_sections_failed)} in {schema_time_elapsed}s.")
-            logging.error(f"❌ [SCHEMA] Failed to complete schema enforcement for Budget Allocation due to section(s): {', '.join(schema_sections_failed)} in {schema_time_elapsed}s.")
+        if schema_sections_failed:
             schema_status_final = "schema_failed_all"
+            print(f"❌ [SCHEMA] Failed to complete Budget Allocation schema enforcement with {schema_rows_output}/{schema_rows_input} enforced row(s) due to section(s) {', '.join(schema_sections_failed)} in {schema_time_elapsed}s.")
+            logging.error(f"❌ [SCHEMA] Failed to complete Budget Allocation schema enforcement with {schema_rows_output}/{schema_rows_input} enforced row(s) due to section(s) {', '.join(schema_sections_failed)} in {schema_time_elapsed}s.")
+        elif schema_rows_output == schema_rows_input:
+            schema_status_final = "schema_succeed_all"
+            print(f"🏆 [SCHEMA] Successfully completed Budget Allocation schema enforcement with {schema_rows_output}/{schema_rows_input} enforced row(s) in {schema_time_elapsed}s.")
+            logging.info(f"🏆 [SCHEMA] Successfully completed Budget Allocation schema enforcement with {schema_rows_output}/{schema_rows_input} enforced row(s) in {schema_time_elapsed}s.")            
         else:
-            print(f"🏆 [SCHEMA] Successfully completed schema enforcement for Budget Allocation with {schema_rows_output} enforced row(s) output in {schema_time_elapsed}s.")
-            logging.info(f"🏆 [SCHEMA] Successfully completed schema enforcement for Budget Allocation with {schema_rows_output} enforced row(s) output in {schema_time_elapsed}s.")
-            schema_status_final = "schema_succeed_all"        
+            schema_status_final = "schema_succeed_partial"
+            print(f"⚠️ [SCHEMA] Partially completed Budget Allocation schema enforcement with {schema_rows_output}/{schema_rows_input} enforced row(s) in {schema_time_elapsed}s.")
+            logging.warning(f"⚠️ [SCHEMA] Partially completed Budget Allocation schema enforcement with {schema_rows_output}/{schema_rows_input} enforced row(s) in {schema_time_elapsed}s.")
         schema_results_final = {
             "schema_df_final": schema_df_final,
             "schema_status_final": schema_status_final,
