@@ -41,6 +41,9 @@ import pytz
 # Add Python time ultilities for integration
 import time
 
+# Add Python IANA time zone ultilities for integration
+from zoneinfo import ZoneInfo
+
 # Add Python Pandas libraries for integration
 import pandas as pd
 
@@ -73,12 +76,12 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
     logging.info(f"🚀 [ENRICH] Starting to enrich staging Budget Allocation for {len(enrich_df_input)} row(s)...")
 
     # 1.1.1. Start timing the staging Budget Allocation enrichment
+    ICT = ZoneInfo("Asia/Ho_Chi_Minh")    
     enrich_time_start = time.time()   
     enrich_sections_status = {}
     enrich_sections_time = {}
-    enrich_df_table = pd.DataFrame()
-    print(f"🔍 [ENRICH] Proceeding to enrich staging Budget Allocation for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
-    logging.info(f"🔍 [ENRICH] Proceeding to enrich staging Budget Allocation for {len(enrich_df_input)} row(s) at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    print(f"🔍 [ENRICH] Proceeding to enrich Budget Allocation for {len(enrich_df_input)} row(s) at {datetime.now(ICT).strftime("%Y-%m-%d %H:%M:%S")}...")
+    logging.info(f"🔍 [ENRICH] Proceeding to enrich Budget Allocation for {len(enrich_df_input)} row(s) at {datetime.now(ICT).strftime("%Y-%m-%d %H:%M:%S")}...")
 
     # 1.1.2. Validate input for the staging Budget Allocation enrichment
     enrich_section_name = "[ENRICH] Validate input for the staging Budget Allocation enrichment"
@@ -125,10 +128,11 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
                 ''.join(vietnamese_characters_all.get(c, c) for c in col) if isinstance(col, str) else col
                 for col in enrich_df_accent.columns
             ]
-            print(f"✅ [ENRICH] Successfully enriched for {len(enrich_df_accent.columns)} column(s) of Budget Allocation by unicode accent removal.")
-            logging.info(f"✅ [ENRICH] Successfully enriched for {len(enrich_df_accent.columns)} column(s) of Budget Allocation by unicode accent removal.")
             enrich_sections_status[enrich_section_name] = "succeed"
+            print(f"✅ [ENRICH] Successfully enriched for {len(enrich_df_accent.columns)} column(s) of Budget Allocation by unicode accent removal.")
+            logging.info(f"✅ [ENRICH] Successfully enriched for {len(enrich_df_accent.columns)} column(s) of Budget Allocation by unicode accent removal.")            
         except Exception as e:
+            enrich_sections_status[enrich_section_name] = "failed"
             print(f"❌ [FETCH] Failed to remove unicode accents from Budget Allocation column name due to {e}.")
             logging.error(f"❌ [FETCH] Failed to remove unicode accents from Budget Allocation column name due to {e}.")
         finally:
@@ -151,9 +155,9 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
                 enrich_account_department=match.group("department") if match else "unknown",
                 enrich_account_name=match.group("account") if match else "unknown"
             )            
+            enrich_sections_status[enrich_section_name] = "succeed"
             print(f"✅ [ENRICH] Successfully enriched table fields for staging Budget Allocation with {len(enrich_df_table)} row(s).")
-            logging.info(f"✅ [ENRICH] Successfully enriched table fields for staging Budget Allocation with {len(enrich_df_table)} row(s).")
-            enrich_sections_status[enrich_section_name] = "succeed"        
+            logging.info(f"✅ [ENRICH] Successfully enriched table fields for staging Budget Allocation with {len(enrich_df_table)} row(s).")            
         except Exception as e:
             enrich_sections_status[enrich_section_name] = "failed"
             print(f"❌ [ENRICH] Failed to enrich table fields for staging Budget Allocation due to {e}.")
@@ -174,6 +178,7 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
             enrich_df_campaign["enrich_budget_retail"] = (enrich_df_campaign["raw_budget_group"] == "KD") * enrich_df_campaign["enrich_budget_actual"]
             enrich_df_campaign["enrich_budget_customer"] = (enrich_df_campaign["raw_budget_group"] == "CS") * enrich_df_campaign["enrich_budget_actual"]
             enrich_df_campaign["enrich_budget_recruitment"] = (enrich_df_campaign["raw_budget_group"] == "HC") * enrich_df_campaign["enrich_budget_actual"]
+            enrich_sections_status[enrich_section_name] = "succeed"
             print(f"✅ [ENRICH] Successfully enriched campaign fields for staging Budget Allocation with {len(enrich_df_campaign)} row(s).")
             logging.info(f"✅ [ENRICH] Successfully enriched campaign fields for staging Budget Allocation with {len(enrich_df_campaign)} row(s).")
         except Exception as e:
@@ -198,9 +203,9 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
             enrich_df_date["raw_date_end"] = pd.to_datetime(enrich_df_date.get("raw_date_end"), errors="coerce")
             enrich_df_date["enrich_time_total"] = (enrich_df_date["raw_date_end"] - enrich_df_date["raw_date_start"]).dt.days
             enrich_df_date["enrich_time_passed"] = ((today - enrich_df_date["raw_date_start"]).dt.days.clip(lower=0))            
-            print(f"✅ [ENRICH] Successfully enriched date fields for staging Budget Allocation with {len(enrich_df_date)} row(s).")
-            logging.info(f"✅ [ENRICH] Successfully enriched date fields for staging Budget Allocation with {len(enrich_df_date)} row(s).")
             enrich_sections_status[enrich_section_name] = "succeed"
+            print(f"✅ [ENRICH] Successfully enriched date fields for staging Budget Allocation with {len(enrich_df_date)} row(s).")
+            logging.info(f"✅ [ENRICH] Successfully enriched date fields for staging Budget Allocation with {len(enrich_df_date)} row(s).")    
         except Exception as e:
             enrich_sections_status[enrich_section_name] = "failed"
             print(f"❌ [ENRICH] Failed to enrich date fields for staging Budget Allocation due to {e}.")
@@ -228,14 +233,18 @@ def enrich_budget_fields(enrich_df_input: pd.DataFrame, enrich_table_id: str) ->
             }
             for enrich_section_summary in enrich_sections_summary
         }        
-        if any(v == "failed" for v in enrich_sections_status.values()):
-            print(f"❌ [ENRICH] Failed to complete staging Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) due to section(s) {', '.join(enrich_sections_failed)} in {enrich_time_elapsed}s.")
-            logging.error(f"❌ [ENRICH] Failed to complete staging Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) due to section(s) {', '.join(enrich_sections_failed)} in {enrich_time_elapsed}s.")
-            enrich_status_final = "enrich_failed_all"        
+        if enrich_sections_failed:
+            enrich_status_final = "enrich_failed_all"
+            print(f"❌ [ENRICH] Failed to complete Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) due to section(s) {', '.join(enrich_sections_failed)} in {enrich_time_elapsed}s.")
+            logging.error(f"❌ [ENRICH] Failed to complete Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) due to section(s) {', '.join(enrich_sections_failed)} in {enrich_time_elapsed}s.")
+        elif enrich_rows_output == enrich_rows_input:
+            enrich_status_final = "enrich_succeed_all"
+            print(f"🏆 [ENRICH] Successfully completed Budget Allocations enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) in {enrich_time_elapsed}s.")
+            logging.info(f"🏆 [ENRICH] Successfully completed Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) in {enrich_time_elapsed}s.")            
         else:
-            print(f"🏆 [ENRICH] Successfully completed staging Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) output in {enrich_time_elapsed}s.")
-            logging.info(f"🏆 [ENRICH] Successfully completed staging Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) output in {enrich_time_elapsed}s.")
-            enrich_status_final = "enrich_succeed_all"                
+            enrich_status_final = "enrich_succeed_partial"
+            print(f"⚠️ [ENRICH] Partially completed Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) in {enrich_time_elapsed}s.")
+            logging.warning(f"⚠️ [ENRICH] Partially completed Budget Allocation enrichment with {enrich_rows_output}/{enrich_rows_input} enriched row(s) in {enrich_time_elapsed}s.")                      
         enrich_results_final = {
             "enrich_df_final": enrich_df_final,
             "enrich_status_final": enrich_status_final,
