@@ -37,6 +37,9 @@ import importlib
 # Add Python logging ultilities for integration
 import logging
 
+# Add Python IANA time zone ultilities for integration
+from zoneinfo import ZoneInfo
+
 # Get environment variable for Company
 COMPANY = os.getenv("COMPANY") 
 
@@ -74,16 +77,17 @@ except ModuleNotFoundError:
 
 # 1.2. Execution controller
 def main():
-    update_date_today = datetime.today()
+    ICT = ZoneInfo("Asia/Ho_Chi_Minh")
+    main_date_today = datetime.now(ICT)
     if PLATFORM == "budget":
         try:
             update_budget_allocation = update_module_location.update_budget_allocation
         except AttributeError:
             raise ImportError(f"❌ [MAIN] Failed to locate Budget Allocation update module due to update_budget_allocation must be defined.")
         if MODE == "thismonth":
-            main_month_updated = update_date_today.strftime("%Y-%m")
+            main_month_updated = main_date_today.strftime("%Y-%m")
         elif MODE == "lastmonth":
-            main_day_start = update_date_today.replace(day=1)
+            main_day_start = main_date_today.replace(day=1)
             main_day_end = main_day_start - timedelta(days=1)
             main_month_updated = main_day_end.strftime("%Y-%m")
         else:
