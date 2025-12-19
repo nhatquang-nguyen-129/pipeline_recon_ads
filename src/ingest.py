@@ -95,15 +95,15 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
             year, month = ingest_month_allocation.split("-")
             month = month.zfill(2)
             ingest_name_sheet = f"m{month}{year}"
-            print(f"✅ [INGEST] Successfully converted {ingest_month_allocation} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
-            logging.info(f"✅ [INGEST] Successfully converted {ingest_month_allocation} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
             ingest_sections_status[ingest_section_name] = "succeed"
+            print(f"✅ [INGEST] Successfully converted {ingest_month_allocation} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")
+            logging.info(f"✅ [INGEST] Successfully converted {ingest_month_allocation} from YYYY-MM format to mMMYYYY with ingest_name_sheet {ingest_name_sheet}.")            
         except Exception as e:
-            print(f"❌ [INGEST] Failed to convert {ingest_month_allocation} from YYYY-MM format to mMMYYY due to {e}.")
-            logging.error(f"❌ [INGEST] Failed to convert {ingest_month_allocation} from YYYY-MM format to mMMYYY due to {e}.")
             ingest_sections_status[ingest_section_name] = "failed"
+            print(f"❌ [INGEST] Failed to convert {ingest_month_allocation} from YYYY-MM format to mMMYYY due to {e}.")
+            logging.error(f"❌ [INGEST] Failed to convert {ingest_month_allocation} from YYYY-MM format to mMMYYY due to {e}.")            
         finally:
-            ingest_sections_status[ingest_section_name] = round(time.time() - ingest_section_start, 2)
+            ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
 
     # 1.1.3. Trigger to fetch Budget Allocation
         ingest_section_name = "[INGEST] Trigger to fetch Budget Allocation"
@@ -116,13 +116,13 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
             ingest_status_fetched = ingest_results_fetched["fetch_status_final"]
             ingest_summary_fetched = ingest_results_fetched["fetch_summary_final"]
             if ingest_status_fetched == "fetch_succeed_all":
-                print(f"✅ [INGEST] Successfully triggered Budget Allocation fetching for {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")
-                logging.info(f"✅ [INGEST] Successfully triggered Budget Allocation fetching for {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")
                 ingest_sections_status[ingest_section_name] = "succeed"
+                print(f"✅ [INGEST] Successfully triggered Budget Allocation fetching for {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")
+                logging.info(f"✅ [INGEST] Successfully triggered Budget Allocation fetching for {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")                
             elif ingest_status_fetched == "fetch_succeed_partial":
+                ingest_sections_status[ingest_section_name] = "partial"                
                 print(f"⚠️ [INGEST] Partially triggered Budget Allocation fetching {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")
-                logging.warning(f"⚠️ [INGEST] Partially triggered Budget Allocation fetching {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")
-                ingest_sections_status[ingest_section_name] = "partial"
+                logging.warning(f"⚠️ [INGEST] Partially triggered Budget Allocation fetching {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")                
             else:
                 ingest_sections_status[ingest_section_name] = "failed"
                 print(f"❌ [INGEST] Failed to trigger Budget Allocation fetching with {ingest_summary_fetched['fetch_rows_output']} fetched row(s) due to {', '.join(ingest_summary_fetched['fetch_sections_failed'])} or unknown error in {ingest_summary_fetched['fetch_time_elapsed']}s.")
@@ -141,9 +141,9 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
             ingest_status_enforced = ingest_results_enforced["schema_status_final"]
             ingest_df_enforced = ingest_results_enforced["schema_df_final"]    
             if ingest_status_enforced == "schema_succeed_all":
-                print(f"✅ [INGEST] Successfully triggered schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
-                logging.info(f"✅ [INGEST] Successfully triggered schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
                 ingest_sections_status[ingest_section_name] = "succeed"
+                print(f"✅ [INGEST] Successfully triggered schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
+                logging.info(f"✅ [INGEST] Successfully triggered schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")                
             else:
                 ingest_sections_status[ingest_section_name] = "failed"
                 print(f"❌ [INGEST] Failed to trigger schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) due to failed section(s) {', '.join(ingest_summary_enforced['schema_sections_failed'])} in {ingest_summary_enforced['fetch_time_elapsed']}s.")
@@ -158,9 +158,9 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
             print(f"🔍 [INGEST] Initializing Google BigQuery client for Google Cloud Platform project {PROJECT}...")
             logging.info(f"🔍 [INGEST] Initializing Google BigQuery client for Google Cloud Platform project {PROJECT}...")
             google_bigquery_client = bigquery.Client(project=PROJECT)
+            ingest_sections_status[ingest_section_name] = "succeed"
             print(f"✅ [INGEST] Successfully initialized Google BigQuery client for Google Cloud Platform project {PROJECT}.")
             logging.info(f"✅ [INGEST] Successfully initialized Google BigQuery client for Google Cloud Platform project {PROJECT}.")
-            ingest_sections_status[ingest_section_name] = "succeed"
         except Exception as e:
             ingest_sections_status[ingest_section_name] = "failed"
             print(f"❌ [INGEST] Failed to initialize Google BigQuery client for Google Cloud Platform project {PROJECT} due to {e}.")
@@ -174,6 +174,7 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
         try:            
             raw_dataset = f"{COMPANY}_dataset_{PLATFORM}_api_raw"
             raw_table_budget = f"{PROJECT}.{raw_dataset}.{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_{ingest_name_sheet}"
+            ingest_sections_status[ingest_section_name] = "succeed"
             print(f"🔍 [INGEST] Proceeding to ingest Budget Allocation for {len(ingest_df_fetched)} fetched row(s) with Google BigQuery table_id {raw_table_budget}...")
             logging.info(f"🔍 [INGEST] Proceeding to ingest Budget Allocation for {len(ingest_df_fetched)} fetched row(s) with Google BigQuery table_id {raw_table_budget}...")
         finally:
