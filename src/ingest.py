@@ -215,7 +215,7 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
                 table_clusters_defined = ["raw_date_month"]
                 table_partition_defined = "date"        
 
-        # Configuration for table schemas
+        # Definition for table schemas
                 if not table_schemas_defined:
                     for col, dtype in ingest_df_deduplicated.dtypes.items():
                         if dtype.name.startswith("int"):
@@ -232,14 +232,14 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
                 else:
                     table_schemas_effective = table_schemas_defined                                    
         
-        # Configuration for table partition     
+        # Definition for table partition     
                 table_partition_effective = (
                     table_partition_defined
                     if table_partition_defined in ingest_df_deduplicated.columns
                     else None
                 )
         
-        # Configuration for table clusters
+        # Definition for table clusters
                 table_clusters_effective = (
                     [c for c in table_clusters_defined if c in ingest_df_deduplicated.columns]
                     if table_clusters_defined
