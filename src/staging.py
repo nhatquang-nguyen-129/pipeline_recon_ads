@@ -270,8 +270,7 @@ def staging_budget_allocation() -> dict:
                 google_bigquery_client.get_table(staging_table_budget)
                 staging_table_exists = True
             except Exception:
-                staging_table_exists = False
-            
+                staging_table_exists = False            
             if not staging_table_exists:
                 print(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} not found then new table creation will be proceeding...")
                 logging.warning(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} not found then new table creation will be proceeding...")        
@@ -285,7 +284,7 @@ def staging_budget_allocation() -> dict:
                     "raw_program_group"
                 ]                   
 
-        # Configuration for table schemas
+        # Definition for table schemas
                 if not table_schemas_defined:
                     for col, dtype in staging_df_deduplicated.dtypes.items():
                         if dtype.name.startswith("int"):
@@ -302,50 +301,40 @@ def staging_budget_allocation() -> dict:
                 else:
                     table_schemas_effective = table_schemas_defined                    
 
-        # Configuration for table partition     
+        # Definition for table partition     
                 table_partition_effective = (
                     table_partition_defined
                     if table_partition_defined in staging_df_deduplicated.columns
                     else None
                 )
         
-        # Configuration for table clusters
+        # Definition for table clusters
                 table_clusters_effective = (
                     [c for c in table_clusters_defined if c in staging_df_deduplicated.columns]
                     if table_clusters_defined
                     else None
                 )
 
-
-                try:
-
-                    for col, dtype in staging_df_deduplicated.dtypes.items():
-                        if dtype.name.startswith("int"):
-                            google_bigquery_type = "INT64"
-                        elif dtype.name.startswith("float"):
-                            google_bigquery_type = "FLOAT64"
-                        elif dtype.name == "bool":
-                            google_bigquery_type = "BOOL"
-                        elif "datetime" in dtype.name:
-                            google_bigquery_type = "TIMESTAMP"
-                        else:
-                            google_bigquery_type = "STRING"
-                        table_schemas_defined.append(bigquery.SchemaField(col, google_bigquery_type))
-                    table_configuration_defined = bigquery.Table(staging_table_budget, schema=table_schemas_defined)
-                    table_partition_effective = table_partition_defined if table_partition_defined in staging_df_deduplicated.columns else None
+        # Execute table creation
+                try:    
+                    print(f"🔍 [STAGING] Creating Budget Allocation table defined name {raw_table_budget} with partition on {table_partition_effective} and cluster on {table_clusters_effective}...")
+                    logging.info(f"🔍 [STAGING] Creating Budget Allocation table defined name {raw_table_budget} with partition on {table_partition_effective} and cluster on {table_clusters_effective}...")
+                    table_configuration_defined = bigquery.Table(
+                        raw_table_budget,
+                        schema=table_schemas_effective
+                    )
                     if table_partition_effective:
                         table_configuration_defined.time_partitioning = bigquery.TimePartitioning(
                             type_=bigquery.TimePartitioningType.DAY,
                             field=table_partition_effective
                         )
-                    table_clusters_effective = [table_cluster_defined for table_cluster_defined in table_clusters_defined if table_cluster_defined in staging_df_deduplicated.columns]
                     if table_clusters_effective:
-                            table_configuration_defined.clustering_fields = table_clusters_effective
-                    staging_table_create = google_bigquery_client.create_table(table_configuration_defined)
-                    staging_table_id = staging_table_create.full_table_id
+                        table_configuration_defined.clustering_fields = table_clusters_effective
+                    query_table_create = google_bigquery_client.create_table(table_configuration_defined)
+                    query_table_id = query_table_create.full_table_id
                     staging_sections_status[staging_section_name] = "succeed"
-                    print(f"✅ [STAGING] Successfully created staging Budget Allocation table with actual name {staging_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_effective}.")
-                    logging.info(f"✅ [STAGING] Successfully created staging Budget Allocation table with actual name {staging_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_effective}.")
+                    print(f"✅ [STAGING] Successfully created staging Budget Allocation table with actual name {query_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_effective}.")
+                    logging.info(f"✅ [STAGING] Successfully created staging Budget Allocation table with actual name {query_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_effective}.")
                 except Exception as e:
                     staging_sections_status[staging_section_name] = "failed"
                     print(f"❌ [STAGING] Failed to create staging Budget Allocation table {staging_table_budget} due to {e}.")
@@ -363,8 +352,8 @@ def staging_budget_allocation() -> dict:
         try:            
             if not staging_table_exists:
                 try: 
-                    print(f"🔍 [STAGING] Uploading {len(staging_df_deduplicated)} deduplicated row(s) of staging Budget Allocation to new Google BigQuery table {staging_table_id}...")
-                    logging.warning(f"🔍 [STAGING] Uploading {len(staging_df_deduplicated)} deduplicated row(s) of staging Budget Allocation to new Google BigQuery table {staging_table_id}...")
+                    print(f"🔍 [STAGING] Uploading {len(staging_df_deduplicated)} deduplicated row(s) of staging Budget Allocation to new Google BigQuery table {query_table_id}...")
+                    logging.warning(f"🔍 [STAGING] Uploading {len(staging_df_deduplicated)} deduplicated row(s) of staging Budget Allocation to new Google BigQuery table {query_table_id}...")
                     job_load_config = bigquery.LoadJobConfig(
                         write_disposition="WRITE_APPEND",
                         time_partitioning=bigquery.TimePartitioning(
@@ -382,12 +371,12 @@ def staging_budget_allocation() -> dict:
                     staging_rows_uploaded = job_load_load.output_rows
                     staging_df_uploaded = staging_df_deduplicated.copy()
                     staging_sections_status[staging_section_name] = "succeed"
-                    print(f"✅ [STAGING] Successfully uploaded {staging_rows_uploaded} deduplicated row(s) of staging Budget Allocation to new Google BigQuery table {staging_table_id}.")
-                    logging.info(f"✅ [STAGING] Successfully uploaded {staging_rows_uploaded} deduplicated row(s) of staging Budget Allocation to new Google BigQuery table {staging_table_id}.")
+                    print(f"✅ [STAGING] Successfully uploaded {staging_rows_uploaded} deduplicated row(s) of staging Budget Allocation to new Google BigQuery table {query_table_id}.")
+                    logging.info(f"✅ [STAGING] Successfully uploaded {staging_rows_uploaded} deduplicated row(s) of staging Budget Allocation to new Google BigQuery table {query_table_id}.")
                 except Exception as e:
                     staging_sections_status[staging_section_name] = "failed"
-                    print(f"❌ [STAGING] Failed to upload {len(staging_df_deduplicated)} deduplicated row(s) of staging Budget Allocation to Google BigQuery table {staging_table_id} due to {e}.")
-                    logging.error(f"❌ [STAGING] Failed to upload {len(staging_df_deduplicated)} deduplicated row(s) of staging Budget Allocation to Google BigQuery table {staging_table_id} due to {e}.")
+                    print(f"❌ [STAGING] Failed to upload {len(staging_df_deduplicated)} deduplicated row(s) of staging Budget Allocation to Google BigQuery table {query_table_id} due to {e}.")
+                    logging.error(f"❌ [STAGING] Failed to upload {len(staging_df_deduplicated)} deduplicated row(s) of staging Budget Allocation to Google BigQuery table {query_table_id} due to {e}.")
             else:
                 try:
                     print(f"🔍 [STAGING] Found existing Google BigQuery table {staging_table_budget} and {len(staging_df_enforced)} row(s) of staging Budget Allocation will be overwritten...")
