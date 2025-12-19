@@ -27,6 +27,9 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
+# Add Python datetime utilities for integration
+from datetime import datetime
+
 # Add Python logging ultilities for integration
 import logging
 
@@ -35,6 +38,9 @@ import time
 
 # Add Python UUID ultilities for integration
 import uuid
+
+# Add Python IANA time zone ultilities for integration
+from zoneinfo import ZoneInfo
 
 # Add Python Pandas libraries for integration
 import pandas as pd
@@ -78,11 +84,12 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
     logging.info(f"🚀 [INGEST] Starting to ingest Budget Allocation for month {ingest_month_allocation}...")
 
     # 1.1.1. Start timing Budget Allocation ingestion
+    ICT = ZoneInfo("Asia/Ho_Chi_Minh")
     ingest_time_start = time.time()
     ingest_sections_status = {}
     ingest_sections_time = {}
-    print(f"🔍 [INGEST] Proceeding to ingest raw Budget Allocation at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
-    logging.info(f"🔍 [INGEST] Proceeding to ingest raw Budget Allocation at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    print(f"🔍 [INGEST] Proceeding to ingest raw Budget Allocation at {datetime.now(ICT).strftime("%Y-%m-%d %H:%M:%S")}...")
+    logging.info(f"🔍 [INGEST] Proceeding to ingest raw Budget Allocation at {datetime.now(ICT).strftime("%Y-%m-%d %H:%M:%S")}...")
 
     try:
 
@@ -112,9 +119,9 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
             print(f"🔁 [INGEST] Triggering to fetch Budget Allocation for month {ingest_month_allocation}...")
             logging.info(f"🔁 [INGEST] Triggering to fetch Budget Allocation for month {ingest_month_allocation}...")
             ingest_results_fetched = fetch_budget_allocation(fetch_month_allocation=ingest_month_allocation)
-            ingest_df_fetched = ingest_results_fetched["fetch_df_final"]
-            ingest_status_fetched = ingest_results_fetched["fetch_status_final"]
+            ingest_df_fetched = ingest_results_fetched["fetch_df_final"]            
             ingest_summary_fetched = ingest_results_fetched["fetch_summary_final"]
+            ingest_status_fetched = ingest_results_fetched["fetch_status_final"]
             if ingest_status_fetched == "fetch_succeed_all":
                 ingest_sections_status[ingest_section_name] = "succeed"
                 print(f"✅ [INGEST] Successfully triggered Budget Allocation fetching for {ingest_summary_fetched['fetch_rows_output']} fetched row(s) in {ingest_summary_fetched['fetch_time_elapsed']}s.")
@@ -134,20 +141,24 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
         ingest_section_name = "[INGEST] Trigger to enforce schema for Budget Allocation"
         ingest_section_start = time.time()
         try:
-            print(f"🔄 [INGEST] Triggering to enforce schema for raw Budget Allocation with {len(ingest_df_fetched)} row(s)...")
-            logging.info(f"🔄 [INGEST] Triggering to enforce schema for raw Budget Allocation with {len(ingest_df_fetched)} row(s)...")
+            print(f"🔄 [INGEST] Triggering to enforce schema for Budget Allocation with {len(ingest_df_fetched)} row(s)...")
+            logging.info(f"🔄 [INGEST] Triggering to enforce schema for Budget Allocation with {len(ingest_df_fetched)} row(s)...")
             ingest_results_enforced = enforce_table_schema(ingest_df_fetched, "ingest_budget_allocation")
+            ingest_df_enforced = ingest_results_enforced["schema_df_final"]
             ingest_summary_enforced = ingest_results_enforced["schema_summary_final"]
-            ingest_status_enforced = ingest_results_enforced["schema_status_final"]
-            ingest_df_enforced = ingest_results_enforced["schema_df_final"]    
+            ingest_status_enforced = ingest_results_enforced["schema_status_final"]            
             if ingest_status_enforced == "schema_succeed_all":
                 ingest_sections_status[ingest_section_name] = "succeed"
-                print(f"✅ [INGEST] Successfully triggered schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
-                logging.info(f"✅ [INGEST] Successfully triggered schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")                
+                print(f"✅ [INGEST] Successfully triggered Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
+                logging.info(f"✅ [INGEST] Successfully triggered Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
+            elif ingest_status_enforced == "schema_succeed_partial":
+                ingest_sections_status[ingest_section_name] = "partial"
+                print(f"⚠️ [FETCH] Partially triggered Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
+                logging.warning(f"⚠️ [FETCH] Partially triggered Budget Allocation metadata schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
             else:
                 ingest_sections_status[ingest_section_name] = "failed"
-                print(f"❌ [INGEST] Failed to trigger schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) due to failed section(s) {', '.join(ingest_summary_enforced['schema_sections_failed'])} in {ingest_summary_enforced['fetch_time_elapsed']}s.")
-                logging.error(f"❌ [INGEST] Failed to trigger schema enforcement for raw Budget Allocation with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) due to failed section(s) {', '.join(ingest_summary_enforced['schema_sections_failed'])} in {ingest_summary_enforced['fetch_time_elapsed']}s.")
+                print(f"❌ [INGEST] Failed to trigger Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
+                logging.error(f"❌ [INGEST] Failed to trigger Budget Allocation schema enforcement with {ingest_summary_enforced['schema_rows_output']}/{len(ingest_df_fetched)} enforced row(s) in {ingest_summary_enforced['schema_time_elapsed']}s.")
         finally:
             ingest_sections_time[ingest_section_name] = round(time.time() - ingest_section_start, 2)
 
@@ -184,11 +195,7 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
         ingest_section_name = "[INGEST] Delete existing row(s) or create new table if it not exist"
         ingest_section_start = time.time()
         try:
-            ingest_df_deduplicated = ingest_df_enforced.drop_duplicates()           
-            table_clusters_defined = ["raw_date_month"]
-            table_clusters_filtered = []
-            table_schemas_defined = []
-            temp_table_id = None
+            ingest_df_deduplicated = ingest_df_enforced.drop_duplicates()
             try:
                 print(f"🔍 [INGEST] Checking raw Budget Allocation table {raw_table_budget} existence...")
                 logging.info(f"🔍 [INGEST] Checking raw Budget Allocation table {raw_table_budget} existence...")
@@ -202,37 +209,59 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
             if not ingest_table_existed:
                 print(f"⚠️ [INGEST] Budget Allocation table {raw_table_budget} not found then table creation will be proceeding...")
                 logging.info(f"⚠️ [INGEST] Budget Allocation table {raw_table_budget} not found then table creation will be proceeding...")
-                for col, dtype in ingest_df_deduplicated.dtypes.items():
-                    if dtype.name.startswith("int"):
-                        bq_type = "INT64"
-                    elif dtype.name.startswith("float"):
-                        bq_type = "FLOAT64"
-                    elif dtype.name == "bool":
-                        bq_type = "BOOL"
-                    elif "datetime" in dtype.name:
-                        bq_type = "TIMESTAMP"
-                    else:
-                        bq_type = "STRING"
-                    table_schemas_defined.append(bigquery.SchemaField(col, bq_type))
-                table_configuration_defined = bigquery.Table(raw_table_budget, schema=table_schemas_defined)
-                table_partition_effective = "date" if "date" in ingest_df_deduplicated.columns else None
-                if table_partition_effective:
-                    table_configuration_defined.time_partitioning = bigquery.TimePartitioning(
-                        type_=bigquery.TimePartitioningType.DAY,
-                        field=table_partition_effective
-                    )
-                table_clusters_filtered = [f for f in table_clusters_defined if f in ingest_df_deduplicated.columns]
-                if table_clusters_filtered:  
-                    table_configuration_defined.clustering_fields = table_clusters_filtered  
+        # Table configuration                   
+                table_schemas_defined = []
+                table_clusters_defined = ["raw_date_month"]
+                table_partition_defined = "date"        
+        # Table schemas application
+                if not table_schemas_defined:
+                    for col, dtype in ingest_df_deduplicated.dtypes.items():
+                        if dtype.name.startswith("int"):
+                            bq_type = "INT64"
+                        elif dtype.name.startswith("float"):
+                            bq_type = "FLOAT64"
+                        elif dtype.name == "bool":
+                            bq_type = "BOOL"
+                        elif "datetime" in dtype.name:
+                            bq_type = "TIMESTAMP"
+                        else:
+                            bq_type = "STRING"
+                        table_schemas_effective.append(bigquery.SchemaField(col, bq_type))
+                else:
+                    table_schemas_effective = table_schemas_defined                                    
+        # Table partition application        
+                table_partition_effective = (
+                    table_partition_defined
+                    if table_partition_defined in ingest_df_deduplicated.columns
+                    else None
+                )
+        # Table clusters application
+                table_clusters_effective = (
+                    [c for c in table_clusters_defined if c in ingest_df_deduplicated.columns]
+                    if table_clusters_defined
+                    else None
+                )
                 try:    
-                    print(f"🔍 [INGEST] Creating raw Budget Allocation table defined name {raw_table_budget} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}...")
-                    logging.info(f"🔍 [INGEST] Creating raw Budget Allocation table defined name {raw_table_budget} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}...")
-                    table_metadata_defined = google_bigquery_client.create_table(table_configuration_defined)
-                    print(f"✅ [INGEST] Successfully created raw Budget Allocation table actual name {table_metadata_defined.full_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}.")
-                    logging.info(f"✅ [INGEST] Successfully created raw Budget Allocation table actual name {table_metadata_defined.full_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_filtered}.")
+                    print(f"🔍 [INGEST] Creating Budget Allocation table defined name {raw_table_budget} with partition on {table_partition_effective} and cluster on {table_clusters_effective}...")
+                    logging.info(f"🔍 [INGEST] Creating Budget Allocation table defined name {raw_table_budget} with partition on {table_partition_effective} and cluster on {table_clusters_effective}...")
+                    table_configuration_defined = bigquery.Table(
+                        raw_table_budget,
+                        schema=table_schemas_effective
+                    )
+                    if table_partition_effective:
+                        table_configuration_defined.time_partitioning = bigquery.TimePartitioning(
+                            type_=bigquery.TimePartitioningType.DAY,
+                            field=table_partition_effective
+                        )
+                    if table_clusters_effective:
+                        table_configuration_defined.clustering_fields = table_clusters_effective
+                    query_table_create = google_bigquery_client.create_table(table_configuration_defined)
+                    query_table_id = query_table_create.full_table_id
+                    print(f"✅ [INGEST] Successfully created Budget Allocation table actual name {query_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_effective}.")
+                    logging.info(f"✅ [INGEST] Successfully created Budget Allocation table actual name {query_table_id} with partition on {table_partition_effective} and cluster on {table_clusters_effective}.")
                 except Exception as e:
-                    print(f"❌ [INGEST] Failed to create raw Budget Allocation table {raw_table_budget} due to {e}.")
-                    logging.error(f"❌ [INGEST] Failed to create raw Budget Allocation table {raw_table_budget} due to {e}.")
+                    print(f"❌ [INGEST] Failed to create Budget Allocation table {raw_table_budget} due to {e}.")
+                    logging.error(f"❌ [INGEST] Failed to create Budget Allocation table {raw_table_budget} due to {e}.")
             else:
                 print(f"🔄 [INGEST] Found raw Budget Allocation table {raw_table_budget} then existing row(s) deletion will be proceeding...")
                 logging.info(f"🔄 [INGEST] Found raw Budget Allocation table {raw_table_budget} then existing row(s) deletion will be proceeding...")

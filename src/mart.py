@@ -297,7 +297,7 @@ def mart_aggregate_all():
                         {'\nUNION ALL\n'.join([
                             f'''
                             SELECT
-                                nen_tang,
+                                INITCAP(nen_tang) AS nen_tang,
                                 phong_ban,
                                 tai_khoan,
                                 ma_ngan_sach_cap_1,
@@ -441,11 +441,11 @@ def mart_recon_all():
                     SELECT
                         nen_tang,
                         ma_ngan_sach_cap_1,
+                        hang_muc,
                         chuong_trinh,
                         noi_dung,
                         hinh_thuc,
-                        nhan_su,
-                        hang_muc,
+                        nhan_su,                        
                         thang,
                         SUM(ket_qua) AS ket_qua,
                         SUM(chi_tieu) AS chi_tieu,
@@ -470,9 +470,10 @@ def mart_recon_all():
 
                 SELECT
                     COALESCE(b.ma_ngan_sach_cap_1, c.ma_ngan_sach_cap_1) AS ma_ngan_sach_cap_1,
+                    COALESCE(b.hang_muc, c.hang_muc) AS hang_muc,
                     COALESCE(b.chuong_trinh, c.chuong_trinh) AS chuong_trinh,
                     COALESCE(b.noi_dung, c.noi_dung) AS noi_dung,
-                    COALESCE(b.nen_tang, c.nen_tang, "other") AS nen_tang,
+                    COALESCE(b.kenh, c.nen_tang, "other") AS nen_tang,
                     COALESCE(b.hinh_thuc, c.hinh_thuc, "other") AS hinh_thuc,
                     COALESCE(b.thang, c.thang) AS thang,
                     COALESCE(c.nhan_su, "other") AS nhan_su,
@@ -491,7 +492,7 @@ def mart_recon_all():
                     c.trang_thai AS trang_thai,
 
                     CASE
-                        -- Spend without Budget
+                        -- Status: Spend without Budget
                         WHEN (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
                             AND COALESCE(b.ngan_sach_thuc_chi, 0) = 0
                             AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
@@ -501,11 +502,11 @@ def mart_recon_all():
                             AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
                             THEN "⚪ Spend without Budget (Off)"
 
-                        -- No Budget
+                        -- Status:  No Budget
                         WHEN COALESCE(b.ngan_sach_thuc_chi, 0) = 0
                             THEN "🚫 No Budget"
 
-                        -- Not Yet Started
+                        -- Status:  Not Yet Started
                         WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                             AND CURRENT_DATE() < DATE(b.thoi_gian_bat_dau)
                             THEN "🕓 Not Yet Started"
@@ -518,7 +519,7 @@ def mart_recon_all():
                             AND DATE_DIFF(CURRENT_DATE(), DATE(b.thoi_gian_bat_dau), DAY) <= 3
                             THEN "⚪ Not Set"
 
-                        -- Delayed (>3 days, no spend, not ended)
+                        -- Status:  Delayed (>3 days, no spend, not ended)
                         WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                             AND CURRENT_DATE() >= DATE(b.thoi_gian_bat_dau)
                             AND CURRENT_DATE() <= DATE(b.thoi_gian_ket_thuc)
@@ -527,13 +528,13 @@ def mart_recon_all():
                             AND DATE_DIFF(CURRENT_DATE(), DATE(b.thoi_gian_bat_dau), DAY) > 3
                             THEN "⚠️ Delayed"
 
-                        -- Ended without Spend
+                        -- Status:  Ended without Spend
                         WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                             AND CURRENT_DATE() > DATE(b.thoi_gian_ket_thuc)
                             AND (c.chi_tieu IS NULL OR c.chi_tieu = 0)
                             THEN "🔒 Ended without Spend"
 
-                        -- Low Spend (active)
+                        -- Status: Low Spend (active)
                         WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                             AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
                             AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
@@ -545,7 +546,7 @@ def mart_recon_all():
                                 ) - 0.3
                             THEN "📉 Low Spend"
 
-                        -- High Spend (active)
+                        -- Status: High Spend (active)
                         WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                             AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
                             AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) < 0.95
@@ -557,26 +558,26 @@ def mart_recon_all():
                                 ) + 0.3
                             THEN "📈 High Spend"
 
-                        -- Near Completion (active)
+                        -- Status: Near Completion (active)
                         WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                             AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
                             AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) BETWEEN 0.95 AND 0.99
                             THEN "🟢 Near Completion"
 
-                        -- Off (paused, not ended, not overspend)
+                        -- Status: Off (paused, not ended, not overspend)
                         WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                             AND (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
                             AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
                             AND COALESCE(c.chi_tieu, 0) < b.ngan_sach_thuc_chi * 0.99
                             THEN "⚪ Off (Early Stopped)"
 
-                        -- Completed
+                        -- Status: Completed
                         WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                             AND SAFE_DIVIDE(COALESCE(c.chi_tieu, 0), b.ngan_sach_thuc_chi) > 0.99
                             AND COALESCE(c.chi_tieu, 0) < b.ngan_sach_thuc_chi * 1.01
                             THEN "🔵 Completed"
 
-                        -- Over Budget
+                        -- Status: Over Budget
                         WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                             AND COALESCE(c.chi_tieu, 0) >= b.ngan_sach_thuc_chi * 1.01
                             AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
@@ -586,7 +587,7 @@ def mart_recon_all():
                             AND LOWER(COALESCE(c.trang_thai, '')) != 'active'
                             THEN "⚪ Over Budget (Stopped)"
 
-                        -- In Progress
+                        -- Status: In Progress
                         WHEN COALESCE(b.ngan_sach_thuc_chi, 0) > 0
                             AND (c.chi_tieu IS NOT NULL AND c.chi_tieu > 0)
                             AND LOWER(COALESCE(c.trang_thai, '')) = 'active'
@@ -600,9 +601,10 @@ def mart_recon_all():
                 FROM budget b
                 FULL OUTER JOIN mart_cost_monthly c
                 ON b.ma_ngan_sach_cap_1 = c.ma_ngan_sach_cap_1
+                AND b.hang_muc = c.hang_muc
                 AND b.chuong_trinh = c.chuong_trinh
                 AND b.noi_dung = c.noi_dung
-                AND b.nen_tang = c.nen_tang
+                AND b.kenh = c.nen_tang
                 AND b.hinh_thuc = c.hinh_thuc
                 AND b.thang = c.thang;
             """                 
