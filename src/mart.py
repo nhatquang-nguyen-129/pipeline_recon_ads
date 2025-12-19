@@ -13,7 +13,7 @@ optimized for reporting, dashboarding, and business analysis.
 ✔️ Dynamically identifies all Budget Allocation staging tables  
 ✔️ Applies data transformation, standardization, and type enforcement  
 ✔️ Performs daily-level aggregation of campaign performance metrics  
-✔️ Creates partitioned and clustered MART tables in Google BigQuery  
+✔️ Creates partitioned and clustered tables in Google BigQuery  
 ✔️ Ensures consistency and traceability across the data pipeline  
 
 ⚠️ This module is exclusively responsible for materialized layer  
@@ -120,8 +120,6 @@ def mart_budget_allocation() -> dict:
         mart_section_name = "[MART] Query all staging Budget Allocation tables"
         mart_section_start = time.time()    
         try:
-            print(f"🔄 [MART] Querying staging Budget Allocation table {staging_table_budget} to create or replace materialized table...")
-            logging.info(f"🔄 [MART] Querying staging Budget Allocation table {staging_table_budget} to create or replace materialized table...")            
             query_replace_config = f"""
                 CREATE OR REPLACE TABLE `{mart_table_all}`
                 CLUSTER BY thang, ma_ngan_sach_cap_1, hang_muc AS
@@ -151,7 +149,9 @@ def mart_budget_allocation() -> dict:
                     SAFE_CAST(enrich_budget_customer AS INT) AS ngan_sach_tien_san,
                     SAFE_CAST(enrich_budget_recruitment AS INT) AS ngan_sach_tuyen_dung,
                 FROM `{staging_table_budget}`
-            """
+            """            
+            print(f"🔄 [MART] Querying staging Budget Allocation table {staging_table_budget} to create or replace materialized table...")
+            logging.info(f"🔄 [MART] Querying staging Budget Allocation table {staging_table_budget} to create or replace materialized table...")            
             query_replace_load = google_bigquery_client.query(query_replace_config)
             query_replace_result = query_replace_load.result()
             query_count_config = f"SELECT COUNT(1) AS mart_rows_count FROM `{mart_table_all}`"
