@@ -263,10 +263,7 @@ def staging_budget_allocation() -> dict:
         staging_section_name = "[STAGING] Create new staging Budget Allocation table"
         staging_section_start = time.time()     
         try:
-            staging_df_deduplicated = staging_df_enforced.drop_duplicates()
-            table_clusters_defined = ["raw_budget_group", "raw_category_group", "raw_program_group"]
-            table_partition_defined = "date"
-            table_schemas_defined = []            
+            staging_df_deduplicated = staging_df_enforced.drop_duplicates()  
             try:
                 print(f"🔍 [STAGING] Checking staging Budget Allocation table {staging_table_budget} existence...")
                 logging.info(f"🔍 [STAGING] Checking staging Budget Allocation table {staging_table_budget} existence...")
@@ -274,10 +271,54 @@ def staging_budget_allocation() -> dict:
                 staging_table_exists = True
             except Exception:
                 staging_table_exists = False
+            
             if not staging_table_exists:
+                print(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} not found then new table creation will be proceeding...")
+                logging.warning(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} not found then new table creation will be proceeding...")        
+        
+        # Configuration for table creation               
+                table_schemas_defined = []
+                table_partition_defined = "date"  
+                table_clusters_defined = [
+                    "raw_budget_group",
+                    "raw_category_group", 
+                    "raw_program_group"
+                ]                   
+
+        # Configuration for table schemas
+                if not table_schemas_defined:
+                    for col, dtype in staging_df_deduplicated.dtypes.items():
+                        if dtype.name.startswith("int"):
+                            bq_type = "INT64"
+                        elif dtype.name.startswith("float"):
+                            bq_type = "FLOAT64"
+                        elif dtype.name == "bool":
+                            bq_type = "BOOL"
+                        elif "datetime" in dtype.name:
+                            bq_type = "TIMESTAMP"
+                        else:
+                            bq_type = "STRING"
+                        table_schemas_effective.append(bigquery.SchemaField(col, bq_type))
+                else:
+                    table_schemas_effective = table_schemas_defined                    
+
+        # Configuration for table partition     
+                table_partition_effective = (
+                    table_partition_defined
+                    if table_partition_defined in staging_df_deduplicated.columns
+                    else None
+                )
+        
+        # Configuration for table clusters
+                table_clusters_effective = (
+                    [c for c in table_clusters_defined if c in staging_df_deduplicated.columns]
+                    if table_clusters_defined
+                    else None
+                )
+
+
                 try:
-                    print(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} not found then new table creation will be proceeding...")
-                    logging.warning(f"⚠️ [STAGING] Staging Budget Allocation table {staging_table_budget} not found then new table creation will be proceeding...")
+
                     for col, dtype in staging_df_deduplicated.dtypes.items():
                         if dtype.name.startswith("int"):
                             google_bigquery_type = "INT64"
