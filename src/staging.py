@@ -127,8 +127,6 @@ def staging_budget_allocation() -> dict:
         staging_section_name = "[STAGING] Scan budget allocation tables"
         staging_section_start = time.time()            
         try:
-            print(f"🔍 [STAGING] Scanning all Budget Allocation table(s) from Google BigQuery dataset {raw_dataset}...")
-            logging.info(f"🔍 [STAGING] Scanning all Budget Allocation table(s) from Google BigQuery dataset {raw_dataset}...")
             query_select_config = f"""
                 SELECT table_name
                 FROM `{PROJECT}.{raw_dataset}.INFORMATION_SCHEMA.TABLES`
@@ -137,12 +135,12 @@ def staging_budget_allocation() -> dict:
                     r'^{COMPANY}_table_{PLATFORM}_{DEPARTMENT}_{ACCOUNT}_allocation_m[0-1][0-9][0-9]{{4}}$'
                 )
             """   
+            print(f"🔍 [STAGING] Scanning all Budget Allocation tables from Google BigQuery dataset {raw_dataset}...")
+            logging.info(f"🔍 [STAGING] Scanning all Budget Allocation tables from Google BigQuery dataset {raw_dataset}...")
             query_select_load = google_bigquery_client.query(query_select_config)
             query_select_result = query_select_load.result()
             raw_tables_name = [row.table_name for row in query_select_result]
             raw_tables_budget = [f"{PROJECT}.{raw_dataset}.{t}" for t in raw_tables_name]
-            if not raw_tables_budget:
-                raise RuntimeError("❌ [STAGING] Failed to scan Budget Allocation tables due to no table found.")
             staging_sections_status[staging_section_name] = "succeed"
             print(f"✅ [STAGING] Successfully found {len(raw_tables_budget)} Budget Allocation table(s).")
             logging.info(f"✅ [STAGING] Successfully found {len(raw_tables_budget)} Budget Allocation table(s).")            
@@ -159,12 +157,12 @@ def staging_budget_allocation() -> dict:
         try:
             for raw_table_budget in raw_tables_budget:
                 try:
-                    print(f"🔄 [STAGING] Querying raw Budget Allocation table {raw_table_budget}...")
-                    logging.info(f"🔄 [STAGING] Querying raw Budget Allocation table {raw_table_budget}...")                    
                     query_select_config = f"""
                         SELECT *
                         FROM `{raw_table_budget}`
                     """
+                    print(f"🔄 [STAGING] Querying raw Budget Allocation table {raw_table_budget}...")
+                    logging.info(f"🔄 [STAGING] Querying raw Budget Allocation table {raw_table_budget}...")                    
                     query_select_load = google_bigquery_client.query(query_select_config)
                     staging_df_queried = query_select_load.to_dataframe()
                     staging_tables_queried.append({"raw_table_budget": raw_table_budget, "staging_df_queried": staging_df_queried})
