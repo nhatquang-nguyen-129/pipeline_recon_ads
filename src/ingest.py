@@ -217,6 +217,7 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
 
         # Definition for table schemas
                 if not table_schemas_defined:
+                    table_schemas_effective = []
                     for col, dtype in ingest_df_deduplicated.dtypes.items():
                         if dtype.name.startswith("int"):
                             bq_type = "INT64"
@@ -274,63 +275,64 @@ def ingest_budget_allocation(ingest_month_allocation: str) -> pd.DataFrame:
         
         # Configuration for table delete keys
                 unique_keys_defined = ["raw_date_month"]                
-                if not unique_keys_defined.empty:
-                    temporary_table_id = f"{PROJECT}.{raw_dataset}.temp_table_campaign_metadata_delete_keys_{uuid.uuid4().hex[:8]}"
-                    unique_keys_effective = (
+        
+        # Definition for table delete keys
+                temporary_table_id = f"{PROJECT}.{raw_dataset}.temp_table_campaign_metadata_delete_keys_{uuid.uuid4().hex[:8]}"
+                unique_keys_effective = (
                         ingest_df_deduplicated[unique_keys_defined]
                         .dropna()
                         .drop_duplicates()
                         if unique_keys_defined
                         else None
-                    )
-        
-        # Configuration for table delete query
-                    query_delete_condition = " AND ".join([
-                        f"CAST(main.{col} AS STRING) = CAST(temp.{col} AS STRING)"
-                        for col in unique_keys_effective
-                    ])
-                    query_delete_config = f"""
-                        DELETE FROM `{raw_table_budget}` AS main
-                        WHERE EXISTS (
-                            SELECT 1 FROM `{temporary_table_id}` AS temp
-                            WHERE {query_delete_condition}
-                        )
-                    """
-        
+                )
+
         # Execute temporary table creation         
-                    try:
-                        print(f"🔍 [INGEST] Creating temporary table contains duplicated Budget Allocation unique keys for batch deletion...")
-                        logging.info(f"🔍 [INGEST] Creating temporary table contains duplicated Budget Allocation unique keys for batch deletion...")
-                        job_load_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
-                        job_load_load = google_bigquery_client.load_table_from_dataframe(
-                            unique_keys_effective, 
-                            temporary_table_id, 
-                            job_config=job_load_config
-                        )
-                        job_load_result = job_load_load.result()
-                        created_table_id = f"{job_load_load.destination.project}.{job_load_load.destination.dataset_id}.{job_load_load.destination.table_id}"
-                        print(f"✅ [INGEST] Successfully created temporary Budget Allocation table {created_table_id} for batch deletion.")
-                        logging.info(f"✅ [INGEST] Successfully created temporary Budget Allocation table {created_table_id} for batch deletion.")
-                    except Exception as e:
-                        print(f"❌ [INGEST] Failed to create temporary Budget Allocation table {temporary_table_id} for batch deletion due to {e}.")
-                        logging.error(f"❌ [INGEST] Failed to create temporary Budget Allocation table {temporary_table_id} for batch deletion due to {e}.")
-        
+                try:
+                    print(f"🔍 [INGEST] Creating temporary table contains duplicated Budget Allocation unique keys for batch deletion...")
+                    logging.info(f"🔍 [INGEST] Creating temporary table contains duplicated Budget Allocation unique keys for batch deletion...")
+                    job_load_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
+                    job_load_load = google_bigquery_client.load_table_from_dataframe(
+                        unique_keys_effective, 
+                        temporary_table_id, 
+                        job_config=job_load_config
+                    )
+                    job_load_result = job_load_load.result()
+                    created_table_id = f"{job_load_load.destination.project}.{job_load_load.destination.dataset_id}.{job_load_load.destination.table_id}"
+                    print(f"✅ [INGEST] Successfully created temporary Budget Allocation table {created_table_id} for batch deletion.")
+                    logging.info(f"✅ [INGEST] Successfully created temporary Budget Allocation table {created_table_id} for batch deletion.")
+                except Exception as e:
+                    print(f"❌ [INGEST] Failed to create temporary Budget Allocation table {temporary_table_id} for batch deletion due to {e}.")
+                    logging.error(f"❌ [INGEST] Failed to create temporary Budget Allocation table {temporary_table_id} for batch deletion due to {e}.")
+
+        # Configuration for table delete query
+                query_delete_condition = " AND ".join([
+                    f"CAST(main.{col} AS STRING) = CAST(temp.{col} AS STRING)"
+                    for col in unique_keys_effective
+                ])
+                query_delete_config = f"""
+                    DELETE FROM `{raw_table_budget}` AS main
+                    WHERE EXISTS (
+                        SELECT 1 FROM `{temporary_table_id}` AS temp
+                        WHERE {query_delete_condition}
+                    )
+                """
+
         # Execute batch delete                
-                    try:                        
-                        print(f"🔍 [INGEST] Deleting existing row of Budget Allocation using batch deletion with unique key(s) {unique_keys_defined}...")
-                        logging.info(f"🔍 [INGEST] Deleting existing row of Budget Allocation using batch deletion with unique key(s) {unique_keys_defined}...")
-                        query_delete_load = google_bigquery_client.query(query_delete_config)
-                        query_delete_result = query_delete_load.result()
-                        ingest_rows_deleted = query_delete_result.num_dml_affected_rows
-                        google_bigquery_client.delete_table(
-                            temporary_table_id, 
-                            not_found_ok=True
-                        )                    
-                        print(f"✅ [INGEST] Successfully deleted {ingest_rows_deleted} existing row(s) of Budget Allocation table {raw_table_budget}.")
-                        logging.info(f"✅ [INGEST] Successfully deleted {ingest_rows_deleted} existing row(s) of Budget Allocation table {raw_table_budget}.")
-                    except Exception as e:
-                        print(f"❌ [INGEST] Failed to delete existing rows of Budget Allocation table {raw_table_budget} by batch deletion due to {e}.")
-                        logging.error(f"❌ [INGEST] Failed to delete existing rows of Budget Allocation table {raw_table_budget} by batch deletion due to {e}.")
+                try:                        
+                    print(f"🔍 [INGEST] Deleting existing row of Budget Allocation using batch deletion with unique key(s) {unique_keys_defined}...")
+                    logging.info(f"🔍 [INGEST] Deleting existing row of Budget Allocation using batch deletion with unique key(s) {unique_keys_defined}...")
+                    query_delete_load = google_bigquery_client.query(query_delete_config)
+                    query_delete_result = query_delete_load.result()
+                    ingest_rows_deleted = query_delete_result.num_dml_affected_rows
+                    google_bigquery_client.delete_table(
+                        temporary_table_id, 
+                        not_found_ok=True
+                    )                    
+                    print(f"✅ [INGEST] Successfully deleted {ingest_rows_deleted} existing row(s) of Budget Allocation table {raw_table_budget}.")
+                    logging.info(f"✅ [INGEST] Successfully deleted {ingest_rows_deleted} existing row(s) of Budget Allocation table {raw_table_budget}.")
+                except Exception as e:
+                    print(f"❌ [INGEST] Failed to delete existing rows of Budget Allocation table {raw_table_budget} by batch deletion due to {e}.")
+                    logging.error(f"❌ [INGEST] Failed to delete existing rows of Budget Allocation table {raw_table_budget} by batch deletion due to {e}.")
             ingest_sections_status[ingest_section_name] = "succeed"
         except Exception as e:
             ingest_sections_status[ingest_section_name] = "failed"
