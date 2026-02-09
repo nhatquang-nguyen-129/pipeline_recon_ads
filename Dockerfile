@@ -1,17 +1,27 @@
-# Use official lightweight Python image
 FROM python:3.13-slim
 
-# Set workdir
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# Copy dependency files
-COPY requirements.txt .
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements/ requirements/
 
-# Copy entire project
+RUN pip install --no-cache-dir pip-tools \
+    && pip-compile requirements/base.in \
+        --output-file requirements/base.txt \
+        --resolver=backtracking \
+    && pip install --no-cache-dir -r requirements/base.txt
+
+RUN dbt --version
+
 COPY . .
 
-# Container entrypoint
 ENTRYPOINT ["python", "main.py"]
