@@ -98,34 +98,27 @@ def transform_budget_allocation(
     df["start_date"] = pd.to_datetime(
         df["start_date"],
         errors="coerce",
-        utc=True,
     )
 
     df["end_date"] = pd.to_datetime(
         df["end_date"],
         errors="coerce",
-        utc=True,
     )
 
-    df["date_start"] = df["raw_date_start"].dt.floor("D")
-    df["date_end"] = df["raw_date_end"].dt.floor("D")
+    df["year"] = pd.to_datetime(
+        df["month"] + "-01",
+        format="%Y-%m-%d",
+        errors="coerce"
+    ).dt.year
 
-    df["enrich_time_total"] = (
+    df["total_effective_time"] = (
         df["date_end"] - df["date_start"]
     ).dt.days
 
     today = pd.Timestamp.utcnow().normalize()
-    df["enrich_time_passed"] = (
+    df["total_passed_time"] = (
         today - df["date_start"]
     ).dt.days.clip(lower=0)
-
-    df = df.drop(
-        columns=[
-            "raw_date_start",
-            "raw_date_end",
-        ],
-        errors="ignore",
-    )
 
     print(
         "✅ [TRANSFORM] Successfully transformed "
