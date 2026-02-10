@@ -1,7 +1,7 @@
 {{
   config(
     materialized = 'ephemeral',
-    tags = ['stg', 'ads', 'spend']
+    tags = ['mart', 'recon', 'spend']
   )
 }}
 

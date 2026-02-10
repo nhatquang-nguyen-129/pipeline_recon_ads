@@ -9,7 +9,7 @@
       'pillar_group',
       'content_group'
     ],
-    tags = ['mart', 'ads', 'budget', 'recon']
+    tags = ['mart', 'recon', 'spend']
   )
 }}
 

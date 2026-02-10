@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from google.cloud import secretmanager
 from google.api_core.client_options import ClientOptions
 
-from dags.dags_budget_allocation import dags_budget_allocation
+from dags.dags_budget_reconciliation import dags_budget_reconciliation_1
 
 COMPANY = os.getenv("COMPANY")
 PROJECT = os.getenv("PROJECT")
@@ -127,7 +127,7 @@ def main():
         )     
 
 # Execute DAGS
-    dags_budget_allocation(
+    dags_budget_reconciliation_1(
         worksheet_name=worksheet_name,
         spreadsheet_id=spreadsheet_id
     )
