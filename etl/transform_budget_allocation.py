@@ -112,12 +112,12 @@ def transform_budget_allocation(
     ).dt.year
 
     df["total_effective_time"] = (
-        df["date_end"] - df["date_start"]
+        df["end_date"] - df["start_date"]
     ).dt.days
 
     today = pd.Timestamp.utcnow().normalize()
     df["total_passed_time"] = (
-        today - df["date_start"]
+        today - df["start_date"]
     ).dt.days.clip(lower=0)
 
     print(

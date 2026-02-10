@@ -35,6 +35,8 @@ select
     cast(null as string)  as content_group,
 
     cast(null as string)  as month,
+    cast(null as int64)   as year,
+
     cast(null as date)    as start_date,
     cast(null as date)    as end_date,
 
@@ -43,7 +45,17 @@ select
 
     cast(null as numeric) as initial_budget,
     cast(null as numeric) as adjusted_budget,
-    cast(null as numeric) as additional_budget
+    cast(null as numeric) as additional_budget,
+    cast(null as numeric) as actual_budget,
+
+    cast(null as numeric) as grouped_marketing_budget,
+    cast(null as numeric) as grouped_supplier_budget,
+    cast(null as numeric) as grouped_store_retail,
+    cast(null as numeric) as grouped_customer_budget,
+    cast(null as numeric) as grouped_recruitment_budget,
+
+    cast(null as int64)   as total_effective_time,
+    cast(null as int64)   as total_passed_time
 
 where false
 
@@ -62,6 +74,7 @@ select
     content_group,
 
     month,
+    year,
 
     date(start_date) as start_date,
     date(end_date)   as end_date,
@@ -72,7 +85,16 @@ select
     initial_budget,
     adjusted_budget,
     additional_budget,
-    actual_budget
+    actual_budget,
+
+    grouped_marketing_budget,
+    grouped_supplier_budget,
+    grouped_store_retail,
+    grouped_customer_budget,
+    grouped_recruitment_budget,
+
+    total_effective_time,
+    total_passed_time
 
 from `{{ target.project }}.{{ raw_schema }}.{{ table_name }}`
 {% if not loop.last %} union all {% endif %}
