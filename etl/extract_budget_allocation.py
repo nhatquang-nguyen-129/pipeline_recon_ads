@@ -16,7 +16,8 @@ from google.cloud import secretmanager
 import gspread
 
 def extract_budget_allocation(
-    month: str,
+    worksheet_name,
+    spreadsheet_id,
 ) -> pd.DataFrame:
     """
     Extract Budget Allocation from Google Sheets
