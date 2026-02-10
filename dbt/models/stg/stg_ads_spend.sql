@@ -1,7 +1,7 @@
 {{
   config(
     materialized = 'ephemeral',
-    tags = ['mart', 'recon', 'spend']
+    tags = ['recon', 'spend']
   )
 }}
 
@@ -15,7 +15,7 @@
             table_catalog as project_id,
             table_schema  as dataset_id,
             table_name
-        from `{{ target.project }}.region-us.INFORMATION_SCHEMA.TABLES`
+        from `{{ target.project }}.region-asia-southeast1.INFORMATION_SCHEMA.TABLES`
         where
             table_schema like '{{ mart_prefix }}%'
             and lower(table_schema) not like '%recon%'

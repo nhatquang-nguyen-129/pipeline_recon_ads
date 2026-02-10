@@ -95,8 +95,8 @@ def dags_budget_reconciliation(
     # Load
     _budget_allocation_direction = (
         f"{PROJECT}."
-        f"{COMPANY}_dataset_budget_api_raw."
-        f"{COMPANY}_table_budget_allocation_{worksheet_name}"
+        f"{COMPANY}_dataset_recon_api_raw."
+        f"{COMPANY}_table_budget_{DEPARTMENT}_{ACCOUNT}_allocation_{worksheet_name}"
     )
 
     print(

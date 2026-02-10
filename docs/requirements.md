@@ -54,7 +54,7 @@ pip-compile requirements/base.in -o requirements/base.txt
 
 - Install exact libraries version
 ```bash
-pip install -r requirements/base.txt`
+pip install -r requirements/base.txt
 ```
 
 - Do NOT edit `.txt` files manually to avoid conflict

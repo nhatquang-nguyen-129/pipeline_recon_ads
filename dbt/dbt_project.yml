@@ -8,7 +8,7 @@ model-paths: ["models"]
 macro-paths: ["macros"]
 
 models:
-  pipeline_tiktok_ads:
+  pipeline_recon_ads:
     stg:
       +materialized: ephemeral
     int:

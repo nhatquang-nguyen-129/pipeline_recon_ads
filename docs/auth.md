@@ -8,6 +8,8 @@ gcloud auth application-default login `
 # Check quota project trong ADC
 gcloud config get-value project
 
+gcloud auth application-default login
+
 
 (venv) PS D:\data-pipeline\pipeline_recon_ads> gcloud config list
 >>
