@@ -3,126 +3,171 @@ from pathlib import Path
 ROOT_FOLDER_LOCATION = Path(__file__).resolve().parents[2]
 sys.path.append(str(ROOT_FOLDER_LOCATION))
 
-import os
 import time
-from datetime import datetime
-from zoneinfo import ZoneInfo
+import requests
 
 import pandas as pd
 
 from google.auth import default
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import AuthorizedSession
-from google.cloud import secretmanager
+
 import gspread
+from gspread.exceptions import APIError, WorksheetNotFound
 
 def extract_budget_allocation(
     worksheet_name,
     spreadsheet_id,
 ) -> pd.DataFrame:
     """
-    Extract Budget Allocation from Google Sheets
+    Extract Budget Allocation from Google Spreadsheets
     ---------
     Workflow:
-        1. Convert YYYY-MM to worksheet name mMMYYYY
-        2. Retrieve spreadsheet_id from Google Secret Manager
-        3. Initialize gspread client
-        4. Fetch worksheet records
-        5. Return flattened DataFrame
+        1. Validate input worksheet_name
+        2. Validate input spreadsheet_id
+        3. Make API call for spreadsheets.readonly scope
+        4. Append extract tabular data
+        5. Enforce to DataFrame
     ---------
     Returns:
-        pd.DataFrame
+        1. DataFrame:
+            Flattened budget allocation records
     """
 
     start_time = time.time()
-    ICT = ZoneInfo("Asia/Ho_Chi_Minh")
 
-    COMPANY = os.getenv("COMPANY")
-    PROJECT = os.getenv("PROJECT")
-    PLATFORM = os.getenv("PLATFORM")
-    DEPARTMENT = os.getenv("DEPARTMENT")
-    ACCOUNT = os.getenv("ACCOUNT")
+    scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+    creds, _ = default(scopes=scopes)
 
+    # Initialize gspread client
     try:
         print(
-            "🔍 [EXTRACT] Extracting Budget Allocation for month "
-            f"{fetch_month_allocation} at "
-            f"{datetime.now(ICT).strftime('%Y-%m-%d %H:%M:%S')}..."
+            "🔍 [EXTRACT] Initializing Google Gspread client with scopes "
+            f"{scopes}..."
         )
+        
+        google_gspread_client = gspread.Client(auth=creds)
+        google_gspread_client.session = AuthorizedSession(creds)
 
-        # 1. Convert YYYY-MM → mMMYYYY
-        try:
-            year, month = fetch_month_allocation.split("-")
-            worksheet_name = f"m{month.zfill(2)}{year}"
-        except Exception:
-            raise RuntimeError(
-                "❌ [EXTRACT] Invalid fetch_month_allocation format. "
-                "Expected YYYY-MM."
-            )
+    except Exception as e:
+        raise RuntimeError(
+            "❌ [EXTRACT] Failed to initialize Google Gspread client due to "
+            f"{e}."
+        ) from e       
 
-        # 2. Retrieve spreadsheet_id from Secret Manager
-        secret_client = secretmanager.SecretManagerServiceClient()
-
-        secret_id = f"{COMPANY}_secret_{DEPARTMENT}_{PLATFORM}_sheet_id_{ACCOUNT}"
-        secret_name = f"projects/{PROJECT}/secrets/{secret_id}/versions/latest"
-
-        try:
-            secret_response = secret_client.access_secret_version(
-                request={"name": secret_name}
-            )
-            spreadsheet_id = secret_response.payload.data.decode("utf-8")
-        except Exception as e:
-            raise RuntimeError(
-                "❌ [EXTRACT] Failed to retrieve Budget Allocation spreadsheet_id "
-                "from Google Secret Manager."
-            ) from e
-
-        # 3. Initialize gspread client
-        scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-        creds, _ = default(scopes=scopes)
-
-        gspread_client = gspread.Client(auth=creds)
-        gspread_client.session = AuthorizedSession(creds)
-
-        # 4. Fetch worksheet data
-        try:
-            sheet = gspread_client.open_by_key(spreadsheet_id)
-            worksheet = sheet.worksheet(worksheet_name)
-            records = worksheet.get_all_records()
-        except gspread.exceptions.WorksheetNotFound as e:
-            raise RuntimeError(
-                "❌ [EXTRACT] Worksheet "
-                f"{worksheet_name} not found in spreadsheet {spreadsheet_id}."
-            ) from e
-        except Exception as e:
-            raise RuntimeError(
-                "❌ [EXTRACT] Failed to fetch Budget Allocation data "
-                "from Google Sheets."
-            ) from e
+    # Make Gspread API call for budget allocation
+    try:
+        sheet = google_gspread_client.open_by_key(spreadsheet_id)
+        worksheet = sheet.worksheet(worksheet_name)
+        records = worksheet.get_all_records()
 
         if not records:
             print(
-                "⚠️ [EXTRACT] No Budget Allocation data found in worksheet "
-                f"{worksheet_name}. Returning empty DataFrame."
+                "⚠️ [EXTRACT] Completely extracted Budget Allocation from worksheet_name "
+                f"{worksheet_name} but empty DataFrame returned."
             )
-            return pd.DataFrame()
 
-        df = pd.DataFrame(records).replace("", None)
+            df = pd.DataFrame()
+            df.retryable = False
+            df.time_elapsed = round(time.time() - start_time, 2)
+            df.rows_input = None
+            df.rows_output = 0
 
-        df.attrs["retryable"] = False
-        df.attrs["rows_output"] = len(df)
-        df.attrs["time_elapsed"] = round(time.time() - start_time, 2)
+            return df
+
+        df = pd.DataFrame(records)
+        df.retryable = False
+        df.time_elapsed = round(time.time() - start_time, 2)
+        df.rows_input = None
+        df.rows_output = len(df)
 
         print(
-            "✅ [EXTRACT] Successfully extracted Budget Allocation for month "
-            f"{fetch_month_allocation} with "
+            "✅ [EXTRACT] Successfully extracted Budget Allocation from worksheet_name "
+            f"{worksheet_name} with "
             f"{len(df)} row(s) in "
             f"{df.attrs['time_elapsed']}s."
         )
 
         return df
 
-    except Exception as e:
+    except WorksheetNotFound as e:
+        retryable = False
         raise RuntimeError(
-            "❌ [EXTRACT] Failed to extract Budget Allocation for month "
-            f"{fetch_month_allocation} due to {e}."
+            "❌ [EXTRACT] Failed to extract Budget Allocation due to worksheet "
+            f"{worksheet_name} does not exist in spreadsheet "
+            f"{spreadsheet_id}."
+        ) from e
+
+    # Unauthorized credentials
+    except RefreshError as e:
+        retryable = False
+        raise RuntimeError(
+            "❌ [EXTRACT] Failed to extract Budget Allocation due to "
+            "unauthorized Google credentials. Manual re-authentication required."
+        ) from e
+
+    except APIError as e:
+        status = e.response.status_code if e.response else None
+
+    # Unexpected retryable API error
+        if status in {
+            408, 
+            429, 
+            500, 
+            502, 
+            503, 
+            504
+        }:
+            retryable = True
+            raise RuntimeError(
+                "⚠️ [EXTRACT] Failed to extract Budget Allocation for worksheet_name "
+                f"{worksheet_name} due to API error "
+                f"{e} with HTTP request status "
+                f"{status} then this request is eligible to retry."
+            ) from e
+
+    # Unauthorized non-retryable access error
+        if status in {
+            401, 
+            403
+        }:
+            retryable = False
+            raise RuntimeError(
+                "❌ [EXTRACT] Failed to extract Budget Allocation for worksheet_name "
+                f"{worksheet_name} due to unauthorized access "
+                f"{e} then this request is not eligible to retry."
+            ) from e
+
+    # Unexpected non-retryable API error
+        retryable = False
+        raise RuntimeError(
+            "❌ [EXTRACT] Failed to extract Budget Allocation for worksheet_name "
+            f"{worksheet_name} due to API error "
+            f"{e} with HTTP request status "
+            f"{status} then this request is not eligible to retry."
+        ) from e
+
+    # Unexpected retryable request timeout error
+    except requests.exceptions.Timeout as e:
+        retryable = True
+        raise RuntimeError(
+            "⚠️ [EXTRACT] Failed to extract Budget Allocation for worksheet_name"
+            f"{worksheet_name} due to request timeout error then this request is eligible to retry."
+        ) from e
+
+    # Unexpected retryable request connection error
+    except requests.exceptions.ConnectionError as e:
+        retryable = True
+        raise RuntimeError(
+            "⚠️ [EXTRACT] Failed to extract Budget Allocation for worksheet_name "
+            f"{worksheet_name} due to request connection error hen this request is eligible to retry."
+        ) from e
+
+    # Unknown non-retryable error 
+    except Exception as e:
+        retryable = False
+        raise RuntimeError(
+            "❌ [EXTRACT] Failed to extract Budget Allocation for worksheet_name "
+            f"{worksheet_name} due to "
+            f"{e}."
         ) from e
