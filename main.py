@@ -10,13 +10,13 @@ from zoneinfo import ZoneInfo
 from google.cloud import secretmanager
 from google.api_core.client_options import ClientOptions
 
-from dags.dags_budget_reconciliation import dags_budget_reconciliation_1
+from dags.dags_budget_reconciliation import dags_budget_reconciliation
 
-COMPANY = os.getenv("COMPANY")
-PROJECT = os.getenv("PROJECT")
+COMPANY    = os.getenv("COMPANY")
+PROJECT    = os.getenv("PROJECT")
 DEPARTMENT = os.getenv("DEPARTMENT")
-ACCOUNT = os.getenv("ACCOUNT")
-MODE = os.getenv("MODE")
+ACCOUNT    = os.getenv("ACCOUNT")
+MODE       = os.getenv("MODE")
 
 if not all([
     COMPANY,
@@ -33,7 +33,7 @@ def main():
     ---------
     Workflow:
         1. Resolve execution time window from MODE
-        2. Read & validate OS environment variables
+        2. Validate OS environment variables
         3. Load secrets from GCP Secret Manager
         4. Resolve worksheet_name and spreadsheet_id
         5. Dispatch execution to DAG orchestrator
@@ -42,7 +42,7 @@ def main():
     """
     
     print(
-        "🔄 [MAIN] Triggering to update Budget Allocation for "
+        "🔄 [MAIN] Triggering to execute Budget Allocation main entrypoin for "
         f"{ACCOUNT} account of "
         f"{DEPARTMENT} department in "
         f"{COMPANY} company with "
@@ -57,13 +57,13 @@ def main():
     if MODE == "thismonth":
         input_month = today.strftime("%Y-%m")
     elif MODE == "lastmonth":
-        start_date = today.replace(day=1)
         end_date = today - timedelta(days=1)
         input_month = end_date.strftime("%Y-%m")
     else:
         raise ValueError(
             "⚠️ [MAIN] Failed to trigger Budget Allocation main entrypoint due to unsupported mode "
-            f"{MODE}.")
+            f"{MODE}."
+        )
 
     year, month = input_month.split("-")
     month = month.zfill(2)
@@ -105,7 +105,7 @@ def main():
         )
         
         print(
-            "🔍 [MAIN] Retrieving Budget Allocation secret_account_id "
+            "🔍 [MAIN] Retrieving Budget Allocation secret_spreadsheet_id "
             f"{secret_account_name} from Google Secret Manager..."
         )
 
@@ -127,7 +127,7 @@ def main():
         )     
 
 # Execute DAGS
-    dags_budget_reconciliation_1(
+    dags_budget_reconciliation(
         worksheet_name=worksheet_name,
         spreadsheet_id=spreadsheet_id
     )
