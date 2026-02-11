@@ -10,7 +10,7 @@ from etl.extract_budget_allocation import extract_budget_allocation
 from etl.transform_budget_allocation import transform_budget_allocation
 from etl.load_budget_allocation import load_budget_allocation
 
-from dbt.run import dbt_recon_spend
+from dbt.run import dbt_budget_reconciliation
 
 COMPANY     = os.getenv("COMPANY")
 PROJECT     = os.getenv("PROJECT")
@@ -112,7 +112,7 @@ def dags_budget_reconciliation(
 # Materialization with dbt
     print("🔄 [DAGS] Trigger to materialize Budget Allocation with dbt...")
 
-    dbt_recon_spend(
+    dbt_budget_reconciliation(
         google_cloud_project=PROJECT,
         select="tag:mart,tag:recon",
     )
