@@ -24,7 +24,7 @@ def dags_budget_reconciliation(
     spreadsheet_id: str,
 ):
     print(
-        "🔄 [DAGS] Trigger Advertising Reconciliation with Budget Allocation worksheet_name " 
+        "🔄 [DAGS] Trigger to update Budget Reconciliation with worksheet_name " 
         f"{worksheet_name} from spreadsheet_id "
         f"{spreadsheet_id}..."
     )
