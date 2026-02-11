@@ -6,13 +6,13 @@ sys.path.append(str(ROOT_FOLDER_LOCATION))
 import os
 import subprocess
 
-def dbt_recon_spend(
+def dbt_recon_ads(
     *,
     google_cloud_project: str,
     select: str
 ):
     """
-    Run dbt for TikTok Ads
+    Run dbt for Budget Reconciliation
     ---------
     Workflow:
         1. Initialize dbt execution environment
@@ -33,7 +33,7 @@ def dbt_recon_spend(
     ]
 
     print(
-        "🔄 [DBT] Executing dbt build for TikTok Ads "
+        "🔄 [DBT] Executing dbt build for Budget Reconciliation "
         f"{select} insights to Google Cloud Project "
         f"{google_cloud_project}..."
     )
@@ -47,15 +47,15 @@ def dbt_recon_spend(
         )
 
         print(
-            "✅ [DBT] Successfully executed dbt build for TikTok Ads "
-            f"{select} insights to Google Cloud Project "
+            "✅ [DBT] Successfully executed dbt build for Budget Reconciliation "
+            f"{select} selector to Google Cloud Project "
             f"{google_cloud_project}."
         )
 
     except subprocess.CalledProcessError as e:
         raise RuntimeError(
-            "❌ [DBT] Failed to execute dbt build for TikTok Ads "
-            f"{select} insights to Google Cloud Project "
+            "❌ [DBT] Failed to execute dbt build for Budget Reconciliation "
+            f"{select} selector to Google Cloud Project "
             f"{google_cloud_project} due to "
             f"{e}."
         ) from e
