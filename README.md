@@ -2,7 +2,7 @@
   <img src="kidsplaza.png" alt="KidsPlaza Logo" width="300"/>
 </p>
 
-This pipeline integrates **Advertising Reconcilication data**, supporting both **daily synchronization** and **historical backfills**.
+This pipeline integrates **Budget Reconcilication data**, supporting both **daily synchronization** and **historical backfills**.
 
 The system is designed with a **modular architecture** to ensure maintainability, scalability, and controlled evolution over time.
 
