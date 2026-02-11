@@ -8,6 +8,8 @@
 {% set company = var('company') %}
 {% set mart_prefix = company ~ '_dataset_' %}
 
+{% set tables = [] %}
+
 {% if execute %}
 
     {% set tables_query %}
@@ -16,21 +18,22 @@
             table_schema  as dataset_id,
             table_name
         from `{{ target.project }}.region-asia-southeast1.INFORMATION_SCHEMA.TABLES`
-        where
-            table_schema like '{{ mart_prefix }}%'
-            and lower(table_schema) not like '%recon%'
-            and lower(table_name) like '%campaign%'
+        where table_schema like '{{ mart_prefix }}%_api_mart'
+          and lower(table_schema) not like '%recon%'
+          and table_name like '%_all_all_campaign_performance'
     {% endset %}
 
     {% set results = run_query(tables_query) %}
-    {% set tables = results.rows if results is not none else [] %}
 
-{% else %}
-    {% set tables = [] %}
+    {% if results is not none and results.rows | length > 0 %}
+        {% set tables = results.rows %}
+    {% endif %}
+
 {% endif %}
 
 {% if tables | length == 0 %}
 
+-- BigQuery-safe empty result
 select
     cast(null as string)  as platform,
     cast(null as string)  as budget_group_1,
@@ -47,8 +50,7 @@ select
 
     cast(null as numeric) as spend,
     cast(null as string)  as objective_status
-
-where false
+from unnest([]) as _
 
 {% else %}
 
@@ -63,6 +65,7 @@ with union_campaign as (
         region,
 
         category_level_1,
+        personnel,
         track_group,
         pillar_group,
         content_group,
@@ -87,6 +90,7 @@ select
     region,
 
     category_level_1,
+    personnel,
     track_group,
     pillar_group,
     content_group,
@@ -98,10 +102,7 @@ select
 
     case
         when max(
-            case
-                when campaign_status = '🟢' then 1
-                else 0
-            end
+            case when campaign_status = '🟢' then 1 else 0 end
         ) = 1
         then 'active'
         else 'inactive'
@@ -114,6 +115,7 @@ group by
     budget_group_2,
     region,
     category_level_1,
+    personnel,
     track_group,
     pillar_group,
     content_group,

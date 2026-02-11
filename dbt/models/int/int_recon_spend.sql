@@ -24,30 +24,11 @@ with spend as (
         month,
         year,
 
-        sum(spend) as spend,
+        spend,
 
-        max(
-            case
-                when objective_status = 'active' then 1
-                else 0
-            end
-        ) as status,
+        objective_status
 
     from {{ ref('stg_ads_spend') }}
-
-    group by
-        budget_group_1,
-        budget_group_2,
-        region,
-        category_level_1,
-        track_group,
-        pillar_group,
-        content_group,
-        platform,
-        objective,
-        personnel,
-        month,
-        year
 ),
 
 budget as (
@@ -122,41 +103,42 @@ select
 
     s.spend,
     s.personnel,
-    s.status,
+    s.objective_status,
 
     case
-        when s.spend > 0
+        when coalesce(s.spend, 0) > 0
             and coalesce(b.actual_budget, 0) = 0
-            and s.status = 1
-            then '🔴 Spend without Budget'
+            and coalesce(s.objective_status, 'inactive') = 'active'
+        then '🔴 Spend without Budget'
 
-        when s.spend > 0
+        when coalesce(s.spend, 0) > 0
             and coalesce(b.actual_budget, 0) = 0
-            then '⚪ Spend without Budget'
+        then '⚪ Spend without Budget'
 
         when coalesce(b.actual_budget, 0) = 0
-            then '🚫 No Budget'
+        then '🚫 No Budget'
 
         when coalesce(b.actual_budget, 0) > 0
             and current_date() < b.start_date
-            then '🕓 Not Yet Started'
+        then '🕓 Not Yet Started'
 
         when coalesce(b.actual_budget, 0) > 0
             and current_date() > b.end_date
             and coalesce(s.spend, 0) = 0
-            then '🔒 Ended without Spend'
+        then '🔒 Ended without Spend'
 
         when coalesce(b.actual_budget, 0) > 0
-            and safe_divide(s.spend, b.actual_budget) > 1.01
-            then '🔴 Over Budget'
+            and safe_divide(coalesce(s.spend, 0), b.actual_budget) > 1.01
+        then '🔴 Over Budget'
 
         when coalesce(b.actual_budget, 0) > 0
-            and safe_divide(s.spend, b.actual_budget) between 0.95 and 0.99
-            then '🟢 Near Completion'
+            and safe_divide(coalesce(s.spend, 0), b.actual_budget)
+                between 0.95 and 0.99
+        then '🟢 Near Completion'
 
         when coalesce(b.actual_budget, 0) > 0
-            and s.status = 1
-            then '🟢 In Progress'
+            and coalesce(s.objective_status, 'inactive') = 'active'
+        then '🟢 In Progress'
 
         else '❓ Not Recognized'
     end as status

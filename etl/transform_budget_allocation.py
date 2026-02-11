@@ -53,42 +53,53 @@ def transform_budget_allocation(
             "adjusted_budget",
             "additional_budget",
         ]:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+            df[col] = (
+                pd.to_numeric(df[col], errors="coerce")
+                .fillna(0)
+                .round(0)
+                .astype("Int64")
+            )
 
         # Transform derived columns
         df["actual_budget"] = (
             df["initial_budget"]
             + df["adjusted_budget"]
             + df["additional_budget"]
-        )
+        ).astype("Int64")
 
         df["grouped_marketing_budget"] = (
-            df["budget_group_1"] == "KP"
+            (df["budget_group_1"] == "KP").astype("Int64")
         ) * df["actual_budget"]
 
         df["grouped_supplier_budget"] = (
-            df["budget_group_1"] == "NC"
+            (df["budget_group_1"] == "NC").astype("Int64")
         ) * df["actual_budget"]
 
-        df["grouped_store_retail"] = (
-            df["budget_group_1"] == "KD"
+        df["grouped_store_budget"] = (
+            (df["budget_group_1"] == "KD").astype("Int64")
         ) * df["actual_budget"]
 
         df["grouped_customer_budget"] = (
-            df["budget_group_1"] == "CS"
+            (df["budget_group_1"] == "CS").astype("Int64")
         ) * df["actual_budget"]
 
         df["grouped_recruitment_budget"] = (
-            df["budget_group_1"] == "HC"
+            (df["budget_group_1"] == "HC").astype("Int64")
         ) * df["actual_budget"]
 
         # Transform time columns
         df["month"] = df["month"].astype(str).str.strip()
 
-        df["year"] = pd.to_datetime(
+        df["year"] = (
+            pd.to_datetime(
             df["month"] + "-01",
             errors="coerce"
-        ).dt.year        
+            )
+        .dt
+        .year
+        .fillna(0)
+        .astype("Int64")
+        )
 
         df["start_date"] = pd.to_datetime(
             df["start_date"], errors="coerce"
@@ -99,12 +110,23 @@ def transform_budget_allocation(
         ).dt.tz_localize(ZoneInfo("Asia/Ho_Chi_Minh"))       
 
         df["total_effective_time"] = (
-            df["end_date"] - df["start_date"]
-        ).dt.days
+            (
+                df["end_date"] - df["start_date"]
+            )
+            .dt.days
+            .fillna(0)
+            .astype("Int64")        
+        )
 
         df["total_passed_time"] = (
-            pd.Timestamp.now(tz=ZoneInfo("Asia/Ho_Chi_Minh")).normalize() - df["start_date"]
-        ).dt.days
+            (
+                pd.Timestamp.now(tz=ZoneInfo("Asia/Ho_Chi_Minh")).normalize()
+                - df["start_date"]
+            )
+            .dt.days
+            .fillna(0)
+            .astype("Int64")
+        )
 
         print(
             "✅ [TRANSFORM] Successfully transformed "
@@ -121,5 +143,4 @@ def transform_budget_allocation(
         print("🔎 Traceback:")
         print(traceback.format_exc())
 
-        # QUAN TRỌNG: re-raise để DAG fail đúng
         raise

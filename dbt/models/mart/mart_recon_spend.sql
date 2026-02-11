@@ -1,13 +1,12 @@
 {{
   config(
     materialized = 'table',
+    alias = var('company') ~ '_table_recon_all_all_recon_spend',
     cluster_by = [
       'budget_group_1',
-      'region',
       'category_level_1',
+      'personnel',
       'track_group',
-      'pillar_group',
-      'content_group'
     ],
     tags = ['mart', 'recon', 'spend']
   )

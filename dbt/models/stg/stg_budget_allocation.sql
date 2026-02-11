@@ -6,10 +6,13 @@
 }}
 
 {% set company = var('company') %}
-{% set raw_schema = company ~ '_dataset_budget_raw' %}
+{% set raw_schema = company ~ '_dataset_recon_api_raw' %}
 {% set table_prefix = company ~ '_table_budget_m' %}
 
+{% set table_names = [] %}
+
 {% if execute %}
+
     {% set tables_query %}
         select table_name
         from `{{ target.project }}.{{ raw_schema }}.INFORMATION_SCHEMA.TABLES`
@@ -17,9 +20,11 @@
     {% endset %}
 
     {% set results = run_query(tables_query) %}
-    {% set table_names = results.columns[0].values() if results is not none else [] %}
-{% else %}
-    {% set table_names = [] %}
+
+    {% if results is not none and results.rows | length > 0 %}
+        {% set table_names = results.rows | map(attribute=0) | list %}
+    {% endif %}
+
 {% endif %}
 
 {% if table_names | length == 0 %}
@@ -56,8 +61,7 @@ select
 
     cast(null as int64)   as total_effective_time,
     cast(null as int64)   as total_passed_time
-
-where false
+from unnest([]) as _
 
 {% else %}
 
@@ -97,6 +101,7 @@ select
     total_passed_time
 
 from `{{ target.project }}.{{ raw_schema }}.{{ table_name }}`
+
 {% if not loop.last %} union all {% endif %}
 
 {% endfor %}
