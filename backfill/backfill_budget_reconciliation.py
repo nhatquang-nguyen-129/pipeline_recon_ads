@@ -12,10 +12,10 @@ from google.api_core.client_options import ClientOptions
 
 from dags.dags_budget_reconciliation import dags_budget_reconciliation
 
-COMPANY = os.getenv("COMPANY")
-PROJECT = os.getenv("PROJECT")
+COMPANY    = os.getenv("COMPANY")
+PROJECT    = os.getenv("PROJECT")
 DEPARTMENT = os.getenv("DEPARTMENT")
-ACCOUNT = os.getenv("ACCOUNT")
+ACCOUNT    = os.getenv("ACCOUNT")
 
 if not all([
     COMPANY,
