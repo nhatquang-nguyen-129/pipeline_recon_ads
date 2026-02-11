@@ -33,7 +33,6 @@
 
 {% if tables | length == 0 %}
 
--- BigQuery-safe empty result
 select
     cast(null as string)  as platform,
     cast(null as string)  as budget_group_1,
@@ -77,6 +76,7 @@ with union_campaign as (
         spend,
         campaign_status
     from `{{ row[0] }}.{{ row[1] }}.{{ row[2] }}`
+    where coalesce(spend, 0) > 0
 
     {% if not loop.last %} union all {% endif %}
 
