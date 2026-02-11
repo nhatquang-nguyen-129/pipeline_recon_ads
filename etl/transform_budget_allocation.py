@@ -5,7 +5,6 @@ sys.path.append(str(ROOT_FOLDER_LOCATION))
 
 import pandas as pd
 from zoneinfo import ZoneInfo
-import traceback
 
 def transform_budget_allocation(
     df: pd.DataFrame
@@ -136,11 +135,7 @@ def transform_budget_allocation(
         return df
 
     except Exception as e:
-        print("❌ [TRANSFORM][ERROR] Exception occurred during transform")
-        print("🔎 Error type:", type(e).__name__)
-        print("🔎 Error message:", str(e))
-
-        print("🔎 Traceback:")
-        print(traceback.format_exc())
-
-        raise
+        raise RuntimeError(
+            "❌ [TRANSFORM] Failed to transform Budget Allocation due to "
+            f"{e}."
+            )
