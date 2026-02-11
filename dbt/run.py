@@ -6,7 +6,7 @@ sys.path.append(str(ROOT_FOLDER_LOCATION))
 import os
 import subprocess
 
-def dbt_recon_ads(
+def dbt_budget_reconciliation(
     *,
     google_cloud_project: str,
     select: str
