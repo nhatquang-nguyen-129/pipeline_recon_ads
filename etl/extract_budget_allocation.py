@@ -60,54 +60,22 @@ def extract_budget_allocation(
 
     # Make Gspread API call for budget allocation
     try:
-        try:
-            print(
-                "🔍 [EXTRACT][STEP 1] Opening spreadsheet by key "
-                f"{spreadsheet_id}..."
-            )
-            sheet = google_gspread_client.open_by_key(spreadsheet_id)
-            print(
-                "✅ [EXTRACT][STEP 1] Successfully opened spreadsheet."
-            )
-
-            print(
-                "🔍 [EXTRACT][STEP 2] Retrieving worksheet "
-                f"{worksheet_name}..."
-            )
-            worksheet = sheet.worksheet(worksheet_name)
-            print(
-                "✅ [EXTRACT][STEP 2] Successfully retrieved worksheet "
-                f"{worksheet_name}."
-            )
-
-            print(
-                "🔍 [EXTRACT][STEP 3] Fetching all records from worksheet "
-                f"{worksheet_name}..."
-            )
-            records = worksheet.get_all_records()
-            print(
-                "✅ [EXTRACT][STEP 3] Successfully fetched "
-                f"{len(records)} record(s) from worksheet "
-                f"{worksheet_name}."
-            )
-
-        except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
-
-            print(
-                "❌ [EXTRACT][DEBUG] Exception occurred during Google Sheet extraction.\n"
-                f"Spreadsheet ID : {spreadsheet_id}\n"
-                f"Worksheet name : {worksheet_name}\n"
-                f"Exception type : {type(e)}\n"
-                f"Exception repr : {repr(e)}\n"
-                f"Traceback:\n{tb}"
-            )
-
-            raise RuntimeError(
-                "❌ [EXTRACT] Failed during Google Sheet extraction. "
-                "See detailed debug logs above."
-            ) from e
+        print(
+            "🔍 [EXTRACT] Extracting Budget Allocation in worksheet_name "
+            f"{worksheet_name} from spreadsheet_id "
+            f"{spreadsheet_id}..."
+        )
+        
+        sheet = google_gspread_client.open_by_key(spreadsheet_id)
+        worksheet = sheet.worksheet(worksheet_name)
+        records = worksheet.get_all_records()
+        
+        print(
+            "✅ [EXTRACT] Successfully extracted "
+            f"{len(records)} record(s) in worksheet_name "
+            f"{worksheet_name} from spreadsheet_id "
+            f"{spreadsheet_id}."
+        )
 
         if not records:
             print(
@@ -148,7 +116,6 @@ def extract_budget_allocation(
         df.attrs.update({
             "success": False,
             "retryable": False,
-            "error_message": (f"Worksheet {worksheet_name} does not exist in spreadsheet {spreadsheet_id}."),
             "time_elapsed": round(time.time() - start_time, 2),
             "rows_input": None,
             "rows_output": 0,
@@ -166,7 +133,6 @@ def extract_budget_allocation(
         df.attrs.update({
             "success": False,
             "retryable": False,
-            "error_message": ("Unauthorized Google credentials. Manual re-authentication required."),
             "time_elapsed": round(time.time() - start_time, 2),
             "rows_input": None,
             "rows_output": 0,
@@ -194,9 +160,6 @@ def extract_budget_allocation(
             df.attrs.update({
                 "success": False,
                 "retryable": True,
-                "error_message": (
-                    f"Google API error {status}: {e}"
-                ),
                 "time_elapsed": round(time.time() - start_time, 2),
                 "rows_input": None,
                 "rows_output": 0,
@@ -219,9 +182,6 @@ def extract_budget_allocation(
             df.attrs.update({
                 "success": False,
                 "retryable": False,
-                "error_message": (
-                    f"Google API error {status}: {e}"
-                ),
                 "time_elapsed": round(time.time() - start_time, 2),
                 "rows_input": None,
                 "rows_output": 0,
@@ -238,7 +198,6 @@ def extract_budget_allocation(
         df.attrs.update({
             "success": False,
             "retryable": False,
-            "error_message": ("Unexpected non-retryable error"),
             "time_elapsed": round(time.time() - start_time, 2),
             "rows_input": None,
             "rows_output": 0,
@@ -257,7 +216,6 @@ def extract_budget_allocation(
         df.attrs.update({
             "success": False,
             "retryable": True,
-            "error_message": f"Request timeout: {e}",
             "time_elapsed": round(time.time() - start_time, 2),
             "rows_input": None,
             "rows_output": 0,
@@ -275,7 +233,6 @@ def extract_budget_allocation(
         df.attrs.update({
             "success": False,
             "retryable": True,
-            "error_message": f"Connection error: {e}",
             "time_elapsed": round(time.time() - start_time, 2),
             "rows_input": None,
             "rows_output": 0,
@@ -293,7 +250,6 @@ def extract_budget_allocation(
         df.attrs.update({
             "success": False,
             "retryable": False,
-            "error_message": f"Unexpected error: {e}",
             "time_elapsed": round(time.time() - start_time, 2),
             "rows_input": None,
             "rows_output": 0,
