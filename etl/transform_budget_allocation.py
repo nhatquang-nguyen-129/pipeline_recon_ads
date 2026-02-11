@@ -9,6 +9,20 @@ from zoneinfo import ZoneInfo
 def transform_budget_allocation(
     df: pd.DataFrame
 ) -> pd.DataFrame:
+    """
+    Transform Budget Allocation
+    ---------
+    Workflow:
+        1. Validate input
+        2. Enrich budget columns
+        3. Normalize date columns
+        4. Calculate time range columns
+        5. Enforce schema
+    ---------
+    Returns:
+        1. DataFrame:
+            Enforced budget allocation records
+    """
 
     print(
         "🔄 [TRANSFORM] Transforming "
@@ -21,9 +35,7 @@ def transform_budget_allocation(
         if df.empty:
             print("⚠️ [TRANSFORM] Empty Budget Allocation input then transformation will be suspended.")
             return df
-
-        print("DEBUG 1: after validation")
-
+        
         required_cols = {
             "budget_group_1",
             "budget_group_2",
@@ -44,8 +56,11 @@ def transform_budget_allocation(
 
         missing = required_cols - set(df.columns)
         if missing:
-            raise ValueError(f"Missing required columns: {missing}")
-
+            raise ValueError(
+                "❌ [TRANSFORM] Failed to transform Budget Allocation due to missing columns "
+                f"{missing} then transformation will be suspended."
+            )
+        
         # Safe cast numeric columns
         for col in [
             "initial_budget",
@@ -138,4 +153,4 @@ def transform_budget_allocation(
         raise RuntimeError(
             "❌ [TRANSFORM] Failed to transform Budget Allocation due to "
             f"{e}."
-            )
+        )
