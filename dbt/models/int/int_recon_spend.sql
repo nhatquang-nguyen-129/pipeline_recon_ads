@@ -19,7 +19,6 @@ with spend as (
 
         platform,
         objective,
-        personnel,
 
         month,
         year,
@@ -59,7 +58,7 @@ budget as (
 
         grouped_marketing_budget,
         grouped_supplier_budget,
-        grouped_store_retail,
+        grouped_store_budget,
         grouped_customer_budget,
         grouped_recruitment_budget,
 
@@ -92,7 +91,7 @@ select
 
     b.grouped_marketing_budget,
     b.grouped_supplier_budget,
-    b.grouped_store_retail,
+    b.grouped_store_budget,
     b.grouped_customer_budget,
     b.grouped_recruitment_budget,
 
@@ -102,17 +101,17 @@ select
     b.total_passed_time,
 
     s.spend,
-    s.personnel,
     s.objective_status,
 
     case
         when coalesce(s.spend, 0) > 0
             and coalesce(b.actual_budget, 0) = 0
-            and coalesce(s.objective_status, 'inactive') = 'active'
+            and lower(coalesce(s.objective_status, '')) = 'active'
         then '🔴 Spend without Budget'
 
         when coalesce(s.spend, 0) > 0
             and coalesce(b.actual_budget, 0) = 0
+            and lower(coalesce(s.objective_status, '')) != 'active'
         then '⚪ Spend without Budget'
 
         when coalesce(b.actual_budget, 0) = 0
@@ -123,24 +122,79 @@ select
         then '🕓 Not Yet Started'
 
         when coalesce(b.actual_budget, 0) > 0
+            and current_date() >= b.start_date
+            and coalesce(s.spend, 0) = 0
+            and (s.objective_status is null or trim(s.objective_status) = '')
+            and date_diff(current_date(), b.start_date, day) <= 3
+        then '⚪ Not Set'
+
+        when coalesce(b.actual_budget, 0) > 0
+            and current_date() between b.start_date and b.end_date
+            and coalesce(s.spend, 0) = 0
+            and (s.objective_status is null or trim(s.objective_status) = '')
+            and date_diff(current_date(), b.start_date, day) > 3
+        then '⚠️ Delayed'
+
+        when coalesce(b.actual_budget, 0) > 0
             and current_date() > b.end_date
             and coalesce(s.spend, 0) = 0
         then '🔒 Ended without Spend'
 
         when coalesce(b.actual_budget, 0) > 0
-            and safe_divide(coalesce(s.spend, 0), b.actual_budget) > 1.01
+            and coalesce(s.spend, 0) >= b.actual_budget * 1.01
+            and lower(coalesce(s.objective_status, '')) = 'active'
         then '🔴 Over Budget'
 
         when coalesce(b.actual_budget, 0) > 0
-            and safe_divide(coalesce(s.spend, 0), b.actual_budget)
-                between 0.95 and 0.99
+            and coalesce(s.spend, 0) >= b.actual_budget * 1.01
+            and lower(coalesce(s.objective_status, '')) != 'active'
+        then '⚪ Over Budget'
+
+
+        when coalesce(b.actual_budget, 0) > 0
+            and safe_divide(coalesce(s.spend, 0), b.actual_budget) > 0.99
+            and coalesce(s.spend, 0) < b.actual_budget * 1.01
+        then '🔵 Completed'
+
+        when coalesce(b.actual_budget, 0) > 0
+            and lower(coalesce(s.objective_status, '')) = 'active'
+            and safe_divide(coalesce(s.spend, 0), b.actual_budget) between 0.95 and 0.99
         then '🟢 Near Completion'
 
         when coalesce(b.actual_budget, 0) > 0
-            and coalesce(s.objective_status, 'inactive') = 'active'
+            and lower(coalesce(s.objective_status, '')) = 'active'
+            and safe_divide(coalesce(s.spend, 0), b.actual_budget) < 0.95
+            and date_diff(b.end_date, b.start_date, day) > 0
+            and safe_divide(coalesce(s.spend, 0), b.actual_budget)
+                < safe_divide(
+                    date_diff(current_date(), b.start_date, day),
+                    date_diff(b.end_date, b.start_date, day)
+                ) - 0.3
+        then '📉 Low Spend'
+
+        when coalesce(b.actual_budget, 0) > 0
+            and lower(coalesce(s.objective_status, '')) = 'active'
+            and safe_divide(coalesce(s.spend, 0), b.actual_budget) < 0.95
+            and date_diff(b.end_date, b.start_date, day) > 0
+            and safe_divide(coalesce(s.spend, 0), b.actual_budget)
+                > safe_divide(
+                    date_diff(current_date(), b.start_date, day),
+                    date_diff(b.end_date, b.start_date, day)
+                ) + 0.3
+        then '📈 High Spend'
+
+        when coalesce(b.actual_budget, 0) > 0
+            and coalesce(s.spend, 0) > 0
+            and lower(coalesce(s.objective_status, '')) != 'active'
+            and coalesce(s.spend, 0) < b.actual_budget * 0.99
+        then '⚪ Off'
+
+        when coalesce(b.actual_budget, 0) > 0
+            and coalesce(s.spend, 0) > 0
+            and lower(coalesce(s.objective_status, '')) = 'active'
         then '🟢 In Progress'
 
-        else '❓ Not Recognized'
+        else '❓ Unrecognized'
     end as status
 
 from budget b

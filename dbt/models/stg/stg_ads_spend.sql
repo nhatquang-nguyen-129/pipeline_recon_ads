@@ -47,8 +47,9 @@ select
 
     cast(null as string)  as objective,
     cast(null as string)  as month,
+    cast(null as int64)  as year,
 
-    cast(null as numeric) as spend,
+    cast(null as int64) as spend,
     cast(null as string)  as objective_status
 from unnest([]) as _
 
@@ -65,13 +66,13 @@ with union_campaign as (
         region,
 
         category_level_1,
-        personnel,
         track_group,
         pillar_group,
         content_group,
 
         objective,
         month,
+        year,
 
         spend,
         campaign_status
@@ -90,13 +91,13 @@ select
     region,
 
     category_level_1,
-    personnel,
     track_group,
     pillar_group,
     content_group,
 
     objective,
     month,
+    year,
 
     sum(spend) as spend,
 
@@ -115,11 +116,11 @@ group by
     budget_group_2,
     region,
     category_level_1,
-    personnel,
     track_group,
     pillar_group,
     content_group,
     objective,
-    month
+    month,
+    year
 
 {% endif %}

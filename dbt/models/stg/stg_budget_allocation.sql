@@ -7,7 +7,7 @@
 
 {% set company = var('company') %}
 {% set raw_schema = company ~ '_dataset_recon_api_raw' %}
-{% set table_prefix = company ~ '_table_budget_m' %}
+{% set table_prefix = company ~ '_table_budget_%' %}
 
 {% set table_names = [] %}
 
@@ -16,7 +16,7 @@
     {% set tables_query %}
         select table_name
         from `{{ target.project }}.{{ raw_schema }}.INFORMATION_SCHEMA.TABLES`
-        where table_name like '{{ table_prefix }}____'
+        where table_name like '{{ table_prefix }}'
     {% endset %}
 
     {% set results = run_query(tables_query) %}
@@ -55,7 +55,7 @@ select
 
     cast(null as numeric) as grouped_marketing_budget,
     cast(null as numeric) as grouped_supplier_budget,
-    cast(null as numeric) as grouped_store_retail,
+    cast(null as numeric) as grouped_store_budget,
     cast(null as numeric) as grouped_customer_budget,
     cast(null as numeric) as grouped_recruitment_budget,
 
@@ -93,7 +93,7 @@ select
 
     grouped_marketing_budget,
     grouped_supplier_budget,
-    grouped_store_retail,
+    grouped_store_budget,
     grouped_customer_budget,
     grouped_recruitment_budget,
 

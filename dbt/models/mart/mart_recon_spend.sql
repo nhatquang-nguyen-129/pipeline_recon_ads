@@ -5,7 +5,6 @@
     cluster_by = [
       'budget_group_1',
       'category_level_1',
-      'personnel',
       'track_group',
     ],
     tags = ['mart', 'recon', 'spend']
