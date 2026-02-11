@@ -37,7 +37,7 @@ def dags_budget_reconciliation(
     # Extract       
         try:
             print(
-                "🔄 [DAGS] Triggering to extract Budget Allocation worksheet_name "
+                "🔄 [DAGS] Triggering to extract Budget Allocation with worksheet_name "
                 f"{worksheet_name} from spreadsheet_id "
                 f"{spreadsheet_id} in "
                 f"{attempt}/{DAGS_BUDGET_ATTEMPTS} attempt(s)..."
@@ -48,33 +48,29 @@ def dags_budget_reconciliation(
                 worksheet_name=worksheet_name,
             )
 
-            if df.empty:
-                print(
-                    "⚠️ [DAGS] Budget Allocation extract returned empty dataframe. "
-                    "DAG execution suspended."
-                )
-                return
-
             break
 
         except Exception as e:
             retryable = getattr(e, "retryable", False)
 
             print(
-                "⚠️ [DAGS] Failed to extract Budget Allocation "
-                f"{attempt}/{DAGS_BUDGET_ATTEMPTS} due to {e}"
+                "⚠️ [DAGS] Failed to extract Budget Allocation with worksheet_name "
+                f"{worksheet_name} from spreadsheet_id "
+                f"{spreadsheet_id} in "
+                f"{attempt}/{DAGS_BUDGET_ATTEMPTS} attempt(s) due to {e}."
             )
 
             if not retryable:
                 raise RuntimeError(
-                    "❌ [DAGS] Non-retryable error occurred while extracting "
-                    "Budget Allocation, DAG execution aborted."
+                    "❌ [DAGS] Failed to extract Budget Allocation with worksheet_name "
+                    f"{worksheet_name} due to non-retryable error then DAG execution will be suspended."
                 ) from e
 
             if attempt == DAGS_BUDGET_ATTEMPTS:
                 raise RuntimeError(
-                    "❌ [DAGS] Exceeded retry attempts while extracting "
-                    "Budget Allocation, DAG execution aborted."
+                    "❌ [DAGS] Failed to extract Budget Allocation with worksheet_name" 
+                    f"{worksheet_name} from spreadsheet_id "
+                    f"{spreadsheet_id} and exceeded retry attempts then DAG execution will be suspended."
                 ) from e
 
             wait_to_retry = 60 + (attempt - 1) * 30
@@ -86,7 +82,7 @@ def dags_budget_reconciliation(
 
     # Transform
     print(
-        "🔄 [DAGS] Transforming Budget Allocation with "
+        "🔄 [DAGS] Triggering to transform Budget Allocation with "
         f"{len(df)} row(s)..."
     )
 
@@ -100,7 +96,7 @@ def dags_budget_reconciliation(
     )
 
     print(
-        "🔄 [DAGS] Loading Budget Allocation to "
+        "🔄 [DAGS] Triggering to load Budget Allocation to direction "
         f"{_budget_allocation_direction}..."
     )
 
