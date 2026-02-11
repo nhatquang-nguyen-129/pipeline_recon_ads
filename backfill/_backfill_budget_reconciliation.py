@@ -24,7 +24,7 @@ def backfill_budget_reconciliation(
     spreadsheet_id: str,
 ):
     print(
-        "🔄 [DAGS] Trigger Advertising Reconciliation with Budget Allocation worksheet_name " 
+        "🔄 [BACKFILL] Trigger Advertising Reconciliation with Budget Allocation worksheet_name " 
         f"{worksheet_name} from spreadsheet_id "
         f"{spreadsheet_id}..."
     )
@@ -37,7 +37,7 @@ def backfill_budget_reconciliation(
     # Extract       
         try:
             print(
-                "🔄 [DAGS] Triggering to extract Budget Allocation worksheet_name "
+                "🔄 [BACKFILL] Triggering to extract Budget Allocation worksheet_name "
                 f"{worksheet_name} from spreadsheet_id "
                 f"{spreadsheet_id} in "
                 f"{attempt}/{DAGS_BUDGET_ATTEMPTS} attempt(s)..."
@@ -50,7 +50,7 @@ def backfill_budget_reconciliation(
 
             if df.empty:
                 print(
-                    "⚠️ [DAGS] Budget Allocation extract returned empty dataframe. "
+                    "⚠️ [BACKFILL] Budget Allocation extract returned empty dataframe. "
                     "DAG execution suspended."
                 )
                 return
@@ -61,32 +61,32 @@ def backfill_budget_reconciliation(
             retryable = getattr(e, "retryable", False)
 
             print(
-                "⚠️ [DAGS] Failed to extract Budget Allocation "
+                "⚠️ [BACKFILL] Failed to extract Budget Allocation "
                 f"{attempt}/{DAGS_BUDGET_ATTEMPTS} due to {e}"
             )
 
             if not retryable:
                 raise RuntimeError(
-                    "❌ [DAGS] Non-retryable error occurred while extracting "
+                    "❌ [BACKFILL] Non-retryable error occurred while extracting "
                     "Budget Allocation, DAG execution aborted."
                 ) from e
 
             if attempt == DAGS_BUDGET_ATTEMPTS:
                 raise RuntimeError(
-                    "❌ [DAGS] Exceeded retry attempts while extracting "
+                    "❌ [BACKFILL] Exceeded retry attempts while extracting "
                     "Budget Allocation, DAG execution aborted."
                 ) from e
 
             wait_to_retry = 60 + (attempt - 1) * 30
             print(
-                "🔄 [DAGS] Waiting "
+                "🔄 [BACKFILL] Waiting "
                 f"{wait_to_retry} second(s) before retrying extract..."
             )
             time.sleep(wait_to_retry)
 
     # Transform
     print(
-        "🔄 [DAGS] Transforming Budget Allocation with "
+        "🔄 [BACKFILL] Transforming Budget Allocation with "
         f"{len(df)} row(s)..."
     )
 
@@ -100,7 +100,7 @@ def backfill_budget_reconciliation(
     )
 
     print(
-        "🔄 [DAGS] Loading Budget Allocation to "
+        "🔄 [BACKFILL] Loading Budget Allocation to "
         f"{_budget_allocation_direction}..."
     )
 
@@ -110,7 +110,7 @@ def backfill_budget_reconciliation(
     )
 
 # Materialization with dbt
-    print("🔄 [DAGS] Trigger to materialize Budget Allocation with dbt...")
+    print("🔄 [BACKFILL] Trigger to materialize Budget Allocation with dbt...")
 
     dbt_budget_reconciliation(
         google_cloud_project=PROJECT,
