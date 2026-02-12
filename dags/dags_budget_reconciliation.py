@@ -54,7 +54,7 @@ def dags_budget_reconciliation(
             retryable = getattr(e, "retryable", False)
 
             print(
-                "⚠️ [DAGS] Failed to extract Budget Allocation with worksheet_name "
+                "⚠️ [DAGS] Failed to trigger Budget Allocation extraction with worksheet_name "
                 f"{worksheet_name} from spreadsheet_id "
                 f"{spreadsheet_id} in "
                 f"{attempt}/{DAGS_BUDGET_ATTEMPTS} attempt(s) due to {e}."
@@ -62,13 +62,13 @@ def dags_budget_reconciliation(
 
             if not retryable:
                 raise RuntimeError(
-                    "❌ [DAGS] Failed to extract Budget Allocation with worksheet_name "
+                    "❌ [DAGS] Failed to trigger Budget Allocation extraction with worksheet_name "
                     f"{worksheet_name} due to non-retryable error then DAG execution will be suspended."
                 ) from e
 
             if attempt == DAGS_BUDGET_ATTEMPTS:
                 raise RuntimeError(
-                    "❌ [DAGS] Failed to extract Budget Allocation with worksheet_name" 
+                    "❌ [DAGS] Failed to trigger Budget Allocation extraction with worksheet_name" 
                     f"{worksheet_name} from spreadsheet_id "
                     f"{spreadsheet_id} and exceeded retry attempts then DAG execution will be suspended."
                 ) from e
