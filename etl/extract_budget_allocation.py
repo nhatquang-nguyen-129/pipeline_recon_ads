@@ -156,7 +156,7 @@ def extract_budget_allocation(
             f"{status} then this request is not eligible to retry."
         )
         error.retryable = False
-        raise error from e        
+        raise error from e
 
     # Unexpected retryable request timeout error
     except requests.exceptions.Timeout as e:
@@ -165,7 +165,7 @@ def extract_budget_allocation(
             f"{worksheet_name} due to request timeout error then this request is eligible to retry."
         )
         error.retryable = True
-        raise error from e               
+        raise error from e
 
     # Unexpected retryable request connection error
     except requests.exceptions.ConnectionError as e:
@@ -174,7 +174,7 @@ def extract_budget_allocation(
             f"{worksheet_name} due to request connection error hen this request is eligible to retry."
         )
         error.retryable = True
-        raise error from e       
+        raise error from e
 
     # Unknown non-retryable error 
     except Exception as e:
@@ -184,4 +184,4 @@ def extract_budget_allocation(
             f"{e}."
         )
         error.retryable = False
-        raise error from e          
+        raise error from e
