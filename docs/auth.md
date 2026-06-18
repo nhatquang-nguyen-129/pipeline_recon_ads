@@ -22,9 +22,19 @@
 ```text
 This app is blocked
 
-This app is blocked This app tried to access sensitive info in your Google Account. To keep your account safe, Google blocked this access.
+This app tried to access sensitive info in your Google Account. To keep your account safe, Google blocked this access.
 ```
 
+- In Google Cloud Platform, navigate to **APIs & Services** then **Library**, enable the following APIs including Google Sheets API and Google Drive API
+
+- Add the following scopes to your OAuth2 Client Desktop App
+```bash
+https://www.googleapis.com/auth/spreadsheets
+https://www.googleapis.com/auth/drive.readonly
+https://www.googleapis.com/auth/cloud-platform
+```
+
+- Download the OAuth Client JSON then store this `oauth2_desktop_client.json` file securely and do not commit to Git
 
 ---
 
@@ -48,6 +58,7 @@ gcloud auth login
 - Allow applications using Application Default Credentials to access Google Sheets files stored in Google Drive by authenticating with the required OAuth scopes:
 ```bash
 gcloud auth application-default login `
+  --client-id-file=oauth2_desktop_client.json `
   --scopes="https://www.googleapis.com/auth/spreadsheets,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/cloud-platform"
 ```
 
@@ -109,6 +120,7 @@ gcloud --version
 - Allow applications using Application Default Credentials to access Google Sheets files stored in Google Drive by authenticating with the required OAuth scopes:
 ```bash
 gcloud auth application-default login \
+  --client-id-file=oauth2_desktop_client.json \
   --scopes="https://www.googleapis.com/auth/spreadsheets,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/cloud-platform"
 ```
 
