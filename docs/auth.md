@@ -27,7 +27,9 @@ This app tried to access sensitive info in your Google Account. To keep your acc
 
 - In Google Cloud Platform, navigate to **APIs & Services** then **Library**, enable the following APIs including Google Sheets API and Google Drive API
 
-- Add the following scopes to your OAuth2 Client Desktop App
+- Create a dedicated OAuth 2.0 Desktop App for local development and keep the OAuth Consent Screen in Production mode.
+
+- **Do not** add the following scopes to your OAuth2 Client Desktop App because Google classifies both `spreadsheets` and `drive.readonly` as sensitive OAuth scopes then it may trigger additional verification requirements for the in-production application
 ```bash
 https://www.googleapis.com/auth/spreadsheets
 https://www.googleapis.com/auth/drive.readonly
@@ -55,7 +57,7 @@ gcloud --version
 gcloud auth login
 ```
 
-- Allow applications using Application Default Credentials to access Google Sheets files stored in Google Drive by authenticating with the required OAuth scopes:
+- Allow applications using Application Default Credentials to access Google Sheets files stored in Google Drive by authenticating with the required OAuth scopes then accept the "Google hasn't verified this app" warning
 ```bash
 gcloud auth application-default login `
   --client-id-file=oauth2_desktop_client.json `
@@ -117,7 +119,7 @@ brew install --cask google-cloud-sdk
 gcloud --version
 ```
 
-- Allow applications using Application Default Credentials to access Google Sheets files stored in Google Drive by authenticating with the required OAuth scopes:
+- Allow applications using Application Default Credentials to access Google Sheets files stored in Google Drive by authenticating with the required OAuth scopes then accept the "Google hasn't verified this app" warning
 ```bash
 gcloud auth application-default login \
   --client-id-file=oauth2_desktop_client.json \
