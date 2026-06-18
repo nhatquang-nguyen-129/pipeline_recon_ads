@@ -14,7 +14,7 @@
 
 ---
 
-## Install
+## Install for Windows
 
 ### Activate Python venv
 
@@ -26,6 +26,36 @@
 - Activate Python virtual environment and check `(venv)` in the terminal
 ```bash
 venv/scripts/activate
+```
+
+---
+
+### Install dbt adapter for Google BigQuery
+
+- Install dbt adapter for Google BigQuery using the terminal
+```bash
+pip install dbt-core dbt-bigquery
+```
+
+- Verify installation and check installed dbt version
+```bash
+dbt --version
+```
+
+---
+
+## Install for MacOS
+
+### Activate Python virtual environment
+
+- Create Python virtual environment if `venv\` folder not exists
+```bash
+python3.13 -m venv venv
+```
+
+- Activate Python virtual environment and check `(venv)` in the terminal
+```bash
+source venv/bin/activate
 ```
 
 ---
@@ -95,14 +125,14 @@ dbt --version
 roles/bigquery.metadataViewer
 ```
 
-- Without this permission, dbt may fail with an error similar to
+- Without this permission, dbt may fail to read metadata from Google BigQuery datasets
 ```text
-Without this permission, dbt may fail with an error similar to
+User does not have permission to query table
 ```
 
 ---
 
-### Manual Deployment
+### Manual Deployment for Windows
 
 - Complie only with no execution
 ```bash
@@ -120,6 +150,33 @@ $env:PROJECT="your-gcp-project"
 $env:COMPANY="your-company-in-short"
 $env:DEPARTMENT="your-department"
 $env:ACCOUNT="your-account"
+
+dbt build `
+  --project-dir dbt `
+  --profiles-dir dbt `
+  --select tag:mart
+```
+
+---
+
+### Manual Deployment for MacOS
+
+- Complie only with no execution
+```bash
+dbt compile
+```
+
+- Run all models
+```bash
+dbt build
+```
+
+- Run only budget reconciliation
+```bash
+export PROJECT="your-gcp-project"
+export COMPANY="your-company-in-short"
+export DEPARTMENT="your-department"
+export ACCOUNT="your-account"
 
 dbt build `
   --project-dir dbt `
