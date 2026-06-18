@@ -5,8 +5,8 @@ ROOT_FOLDER_LOCATION = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT_FOLDER_LOCATION))
 
 from datetime import datetime
-from zoneinfo import ZoneInfo
 import traceback
+from zoneinfo import ZoneInfo
 
 from google.cloud import secretmanager
 from google.api_core.client_options import ClientOptions
