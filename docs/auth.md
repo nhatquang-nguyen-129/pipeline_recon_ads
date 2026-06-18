@@ -16,6 +16,18 @@
 
 ## Local setup
 
+### Customize OAuth Client ID to login with Google Drive scopes
+
+-  Attempting to authenticate with these scopes using the default Cloud SDK client may result in the following error:
+```text
+This app is blocked
+
+This app is blocked This app tried to access sensitive info in your Google Account. To keep your account safe, Google blocked this access.
+```
+
+
+---
+
 ### Local setup for Windows
 
 - Download and install Google Cloud SDK from official source
@@ -33,9 +45,10 @@ gcloud --version
 gcloud auth login
 ```
 
-- Login and create **Application Default Credentials** (ADC) used by Google BigQueryAirflow/dbt/Terraform or any other Google Cloud client libraries
+- Allow applications using Application Default Credentials to access Google Sheets files stored in Google Drive by authenticating with the required OAuth scopes:
 ```bash
-gcloud auth application-default login
+gcloud auth application-default login `
+  --scopes="https://www.googleapis.com/auth/spreadsheets,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/cloud-platform"
 ```
 
 - Verify authenticated Google accounts
@@ -44,7 +57,7 @@ gcloud auth list
 ```
 
 - Check all accessible Google Cloud projects attached to the current ADC
-```bash
+```bashß
 gcloud projects list
 ```
 
@@ -93,9 +106,10 @@ brew install --cask google-cloud-sdk
 gcloud --version
 ```
 
-- Login and create **Application Default Credentials** (ADC) used by Google BigQueryAirflow/dbt/Terraform or any other Google Cloud client libraries
+- Allow applications using Application Default Credentials to access Google Sheets files stored in Google Drive by authenticating with the required OAuth scopes:
 ```bash
-gcloud auth application-default login
+gcloud auth application-default login \
+  --scopes="https://www.googleapis.com/auth/spreadsheets,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/cloud-platform"
 ```
 
 - Verify authenticated Google accounts
