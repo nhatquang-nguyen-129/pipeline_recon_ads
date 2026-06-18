@@ -1,6 +1,6 @@
 substitutions:
   _REGION: asia-southeast1
-  _IMAGE: asia-southeast1-docker.pkg.dev/data-ads-external-report-prod/etl-budget-reconcile/v2.0.7
+  _IMAGE: asia-southeast1-docker.pkg.dev/data-ads-external-report-prod/etl-budget-reconcile/v2.0.8
 
 steps:
   - name: 'gcr.io/cloud-builders/docker'
