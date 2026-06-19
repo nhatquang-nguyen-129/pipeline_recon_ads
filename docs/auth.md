@@ -60,7 +60,7 @@ gcloud auth login
 - Allow applications using Application Default Credentials to access Google Sheets files stored in Google Drive by authenticating with the required OAuth scopes then accept the "Google hasn't verified this app" warning
 ```bash
 gcloud auth application-default login `
-  --client-id-file=oauth2_desktop_client.json `
+  --client-id-file=./auth/oauth2_desktop_client.json `
   --scopes="https://www.googleapis.com/auth/spreadsheets,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/cloud-platform"
 ```
 
@@ -122,7 +122,7 @@ gcloud --version
 - Allow applications using Application Default Credentials to access Google Sheets files stored in Google Drive by authenticating with the required OAuth scopes then accept the "Google hasn't verified this app" warning
 ```bash
 gcloud auth application-default login \
-  --client-id-file=oauth2_desktop_client.json \
+  --client-id-file=./auth/oauth2_desktop_client.json \
   --scopes="https://www.googleapis.com/auth/spreadsheets,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/cloud-platform"
 ```
 
@@ -149,6 +149,21 @@ gcloud config get-value project
 - Verify ADC is working
 ```bash
 gcloud auth application-default print-access-token
+```
+
+---
+
+### Overwrite the existing ADC
+
+- ADC credentials are shared across local projects. 
+
+- Running gcloud auth application-default login for another ETL without including Google Sheets scopes may replace the current ADC token and remove previously granted permissions. 
+
+- If an ETL interacts with Google Sheets, always re-authenticate with the required scopes
+```bash
+https://www.googleapis.com/auth/spreadsheets
+https://www.googleapis.com/auth/drive.readonly
+https://www.googleapis.com/auth/cloud-platform
 ```
 
 ## Cloud Run setup
